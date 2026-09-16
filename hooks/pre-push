@@ -1,0 +1,62 @@
+#!/bin/sh
+# Blocks `git push` when the tests fail.
+#
+# Unlike CI, this runs BEFORE anything leaves the machine, so a red build never
+# reaches the remote in the first place. CI still runs afterwards: this hook is
+# trivially skipped with --no-verify, and it never runs for a push made from
+# another clone or from the GitHub web UI.
+#
+# Enable once per clone:
+#     git config core.hooksPath hooks
+
+echo "pre-push: linting and running tests..."
+
+if command -v python >/dev/null 2>&1; then
+    PY=python
+elif command -v python3 >/dev/null 2>&1; then
+    PY=python3
+else
+    echo "pre-push: no python on PATH; skipping tests" >&2
+    exit 0   # don't block a push just because this shell can't find python
+fi
+
+# Lint first: it is the faster of the two, and an unused import is quicker to
+# read here than as a red CI run five minutes later. Skipped rather than fatal
+# when ruff is absent — a hook that fails for a missing tool is one you learn
+# to pass --no-verify to, and then it stops catching the tests as well.
+if "$PY" -m ruff --version >/dev/null 2>&1; then
+    if ! "$PY" -m ruff check .; then
+        echo ""
+        echo "pre-push: LINT FAILED — push aborted."
+        echo "  many are auto-fixable: python -m ruff check . --fix"
+        echo "  or bypass deliberately with: git push --no-verify"
+        exit 1
+    fi
+else
+    echo "pre-push: ruff not installed; skipping lint" >&2
+    echo "  install it with: pip install -r requirements.txt" >&2
+fi
+
+if ! "$PY" tests/run_all.py; then
+    echo ""
+    echo "pre-push: TESTS FAILED — push aborted."
+    echo "  fix them, or bypass deliberately with: git push --no-verify"
+    exit 1
+fi
+
+# A syntax error in a workflow is invisible until the cron fires at 3am.
+if ! "$PY" -c "
+import yaml, pathlib, sys
+try:
+    for f in pathlib.Path('.github/workflows').glob('*.yml'):
+        yaml.safe_load(f.read_text(encoding='utf-8'))
+except Exception as e:
+    print(f'workflow YAML is invalid: {e}', file=sys.stderr)
+    sys.exit(1)
+"; then
+    echo "pre-push: workflow YAML invalid — push aborted." >&2
+    exit 1
+fi
+
+echo "pre-push: ok"
+exit 0

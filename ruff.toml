@@ -1,0 +1,41 @@
+# Lint configuration, committed so CI and a laptop agree. Without a file here
+# ruff falls back to whatever config it finds up the tree or in the user's
+# home, which is how a clean local run and a red CI run happen at once.
+
+target-version = "py311"   # matches setup-python in .github/workflows
+line-length = 88
+
+[lint]
+# Deliberately narrow. These are the rules that catch mistakes:
+#   E, W  pycodestyle — includes E402, which the sys.path.insert preludes in
+#         tools/ and tests/ legitimately need to suppress. Enabling it is what
+#         makes those `# noqa: E402` directives meaningful rather than noise.
+#   F     pyflakes — unused imports and names, redefinitions, undefined names
+#   UP    syntax this Python version has superseded
+select = ["E", "W", "F", "UP"]
+
+# Rules considered and left off, so the choice is a decision rather than an
+# oversight:
+#   BLE001  blind-except. Several broad handlers here are deliberate and
+#           commented — per-source isolation in fetch_all, per-posting in
+#           enrich, and the resume step in intake, where a bad PDF must not
+#           cost the profile. Silencing each one individually would be noise.
+#   DTZ011  date.today(). Deadlines are dates, not instants; a timezone-aware
+#           datetime would be the wrong type for the domain.
+#   SIM102  collapsible-if. The nested conditions here separate "is it time?"
+#           from "did it send?", which is worth a line.
+#   FURB167 re.I -> re.IGNORECASE. Consistent as written.
+#   I001    import sorting. It found no out-of-order import worth the name,
+#           and its formatter rewrites this codebase's compact wrapped imports
+#           to one name per line. That is a restyling, not a defect check.
+
+[lint.per-file-ignores]
+# E501 is off for the four modules that carry prompt text. Rewrapping a line
+# inside a prompt literal is not a formatting change — it alters the bytes sent
+# to the model, and classify.py's PROMPT_VERSION is a cache key precisely
+# because that matters. A linter must not be able to silently invalidate every
+# stored verdict, so these files are exempt rather than reflowed.
+"src/classify.py" = ["E501"]
+"src/intake/clarify.py" = ["E501"]
+"src/intake/extract.py" = ["E501"]
+"src/intake/resume.py" = ["E501"]

@@ -1,0 +1,32 @@
+{
+ "jobPostings": [
+  {
+   "title": "Registered Client Service Associate",
+   "externalPath": "/job/San-Francisco-California-United-States-of-America/Registered-Client-Service-Associate_JR028143",
+   "locationsText": "San Francisco, California, United States of America",
+   "postedOn": "Posted Yesterday",
+   "bulletFields": [
+    "JR028143"
+   ]
+  },
+  {
+   "title": "Wealth Management Associate",
+   "externalPath": "/job/West-Des-Moines-Iowa-United-States-of-America/Wealth-Management-Associate_JR041929-1",
+   "locationsText": "West Des Moines, Iowa, United States of America",
+   "postedOn": "Posted Yesterday",
+   "bulletFields": [
+    "JR041929"
+   ]
+  },
+  {
+   "title": "Portfolio Management Associate",
+   "externalPath": "/job/Boston-Massachusetts-United-States-of-America/Portfolio-Management-Associate_JR037563",
+   "locationsText": "Boston, Massachusetts, United States of America",
+   "postedOn": "Posted Yesterday",
+   "bulletFields": [
+    "JR037563"
+   ]
+  }
+ ],
+ "total": 3
+}

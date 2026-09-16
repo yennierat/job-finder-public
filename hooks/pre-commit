@@ -1,0 +1,48 @@
+#!/bin/sh
+# Blocks a commit that would introduce a secret.
+#
+# Uses gitleaks when installed; falls back to a small built-in scan otherwise, so
+# the hook is never a silent no-op just because a tool is missing.
+#
+# Enable once per clone:
+#     git config core.hooksPath hooks
+#
+# Install gitleaks (recommended, catches far more):
+#     winget install gitleaks          # Windows
+#     brew install gitleaks            # macOS
+
+if command -v gitleaks >/dev/null 2>&1; then
+    echo "pre-commit: gitleaks scanning staged changes..."
+    if ! gitleaks protect --staged --redact --verbose; then
+        echo ""
+        echo "pre-commit: SECRET DETECTED — commit aborted."
+        echo "  remove it, or if it is a false positive add a gitleaks:allow"
+        echo "  comment on the line, or bypass with: git commit --no-verify"
+        exit 1
+    fi
+    echo "pre-commit: gitleaks clean"
+    exit 0
+fi
+
+echo "pre-commit: gitleaks not installed — running fallback scan" >&2
+echo "  install it for real coverage: https://github.com/gitleaks/gitleaks" >&2
+
+# Fallback: catch the specific credential shapes this project actually handles,
+# plus any attempt to commit the env file itself.
+if git diff --cached --name-only | grep -qx ".env"; then
+    echo "pre-commit: .env is staged — commit aborted." >&2
+    exit 1
+fi
+
+# -I skips binary files so state.db never gets scanned as text.
+if git diff --cached -I -U0 | grep -nE \
+    "sk-or-v1-[A-Za-z0-9]{16,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}|(AKIA|ASIA)[A-Z0-9]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----"; then
+    echo ""
+    echo "pre-commit: possible secret in staged changes — commit aborted." >&2
+    echo "  (matched an OpenRouter key, Telegram bot token, AWS key or private key)" >&2
+    echo "  bypass deliberately with: git commit --no-verify" >&2
+    exit 1
+fi
+
+echo "pre-commit: fallback scan clean"
+exit 0

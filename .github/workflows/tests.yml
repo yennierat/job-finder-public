@@ -1,0 +1,67 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch makes an in-flight test run obsolete.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # Before the tests: a lint failure is cheaper to read than a test failure,
+      # and ruff catches the unused import or shadowed name that a hand-rolled
+      # suite has no way to see. Configured by ruff.toml, so this matches what
+      # the pre-push hook runs locally.
+      - name: Lint
+        run: python -m ruff check .
+
+      # Offline: no network, no LLM, no secrets. Safe to run on every push,
+      # including from forks.
+      - name: Unit tests
+        run: python tests/run_all.py
+
+      # Catches an unparseable workflow or a config file broken by a hand edit
+      # — failures that otherwise only surface at 3am when the cron fires.
+      - name: Validate YAML and imports
+        run: |
+          python -c "
+          import yaml, pathlib
+          for f in pathlib.Path('.').rglob('*.yml'):
+              yaml.safe_load(f.read_text(encoding='utf-8'))
+          for f in ['config/sources.yaml', 'config/profile.yaml']:
+              yaml.safe_load(pathlib.Path(f).read_text(encoding='utf-8'))
+          print('yaml ok')
+          "
+          python -c "
+          import src.run, src.classify, src.llm, src.store, src.notify, src.prefilter
+          from src.fetchers import REGISTRY
+          print('imports ok, adapters:', sorted(REGISTRY))
+          "
+
+      - name: Check sources.yaml matches available adapters
+        run: |
+          python -c "
+          import yaml
+          from src.fetchers import REGISTRY
+          srcs = yaml.safe_load(open('config/sources.yaml', encoding='utf-8'))['sources']
+          missing = sorted({s['platform'] for s in srcs} - set(REGISTRY))
+          assert not missing, f'sources.yaml uses adapters that do not exist: {missing}'
+          print(f'{len(srcs)} sources, all adapters present')
+          "

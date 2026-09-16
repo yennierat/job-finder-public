@@ -1,0 +1,59 @@
+# An EXAMPLE profile, so the repository runs out of the box. Replace it.
+#
+#   python -m src.intake            writes this file from a short conversation
+#   python tools/import_resume.py   adds a resume, which turns on fit scoring
+#
+# It is plain YAML and safe to edit by hand. Everything here reaches the model
+# as data, never as instruction. There is no resume block below, so verdicts
+# carry no fit score until you add one.
+
+employment_types:
+- internship
+
+# Cities, or a region the prefilter expands into cities ("Europe" covers 26).
+locations:
+- Singapore
+remote_ok: true
+
+# Postings whose stated dates cannot overlap this are rejected on timing.
+start_window:
+  start: '2027-06-01'
+  end: '2027-08-31'
+
+# What the work must actually be. This decides most verdicts: a role in the
+# right city, on the right dates, doing work outside these fields is not a match.
+fields:
+- software engineering
+- artificial intelligence
+
+seniority: intern
+
+# An OR, not an AND: any single hit keeps the posting. Empty keeps anything the
+# rules below do not exclude.
+must_have_keywords: []
+
+# Matched against the title only, so keep them unambiguous.
+exclude_keywords:
+- full-time
+- permanent
+- senior
+- manager
+- PhD
+- Doctorate
+
+# Restrict to sources carrying these tags in sources.yaml; null means all of them.
+source_tags: null
+
+# Anything an advert would have to respect that the fields above cannot express:
+# work authorisation, study commitments, a field you will not take. It reaches
+# the model as fenced data, and the classifier reports visa terms rather than
+# guessing at them — so state what is true and let it judge from that.
+freeform_notes: Undergraduate, so reject anything requiring enrolment in a PhD or
+  a completed doctorate. No right to work in the United States and no sponsorship
+  available there. On-site is acceptable, hybrid or remote preferred.
+
+# Written by `python -m src.intake` when it widens your stated fields; harmless
+# to leave empty.
+inferred_fields: []
+
+profile_version: '1'

@@ -1,0 +1,10 @@
+.env
+state.db
+__pycache__/
+*.pyc
+.venv/
+.claude/
+
+shortlist.md
+shortlist.json
+shortlist.csv

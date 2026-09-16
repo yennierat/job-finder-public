@@ -1,0 +1,596 @@
+sources:
+- id: 1password-ashby
+  name: 1password
+  platform: ashby
+  board: 1password
+  tags:
+  - saas
+- id: adyen-greenhouse
+  name: adyen
+  platform: greenhouse
+  board: adyen
+  tags:
+  - fintech
+- id: affirm-greenhouse
+  name: affirm
+  platform: greenhouse
+  board: affirm
+  tags:
+  - fintech
+- id: airbnb-greenhouse
+  name: airbnb
+  platform: greenhouse
+  board: airbnb
+  tags:
+  - bigtech
+- id: airbyte-ashby
+  name: airbyte
+  platform: ashby
+  board: airbyte
+  tags:
+  - infra
+- id: airwallex-ashby
+  name: airwallex
+  platform: ashby
+  board: airwallex
+  tags:
+  - fintech
+- id: akunacapital-greenhouse
+  name: akunacapital
+  platform: greenhouse
+  board: akunacapital
+  tags:
+  - trading
+- id: amber-ashby
+  name: amber
+  platform: ashby
+  board: amber
+  tags:
+  - fintech
+- id: ambergroup-lever
+  name: ambergroup
+  platform: lever
+  board: ambergroup
+  tags:
+  - fintech
+- id: amplitude-ashby
+  name: amplitude
+  platform: ashby
+  board: amplitude
+  tags:
+  - saas
+- id: anthropic-greenhouse
+  name: anthropic
+  platform: greenhouse
+  board: anthropic
+  tags:
+  - ai
+- id: asana-greenhouse
+  name: asana
+  platform: greenhouse
+  board: asana
+  tags:
+  - saas
+- id: bcg-greenhouse
+  name: bcg
+  platform: greenhouse
+  board: bcg
+  tags: []
+- id: belvederetrading-lever
+  name: belvederetrading
+  platform: lever
+  board: belvederetrading
+  tags:
+  - trading
+- id: binance-lever
+  name: binance
+  platform: lever
+  board: binance
+  tags:
+  - fintech
+- id: biofourmis-greenhouse
+  name: biofourmis
+  platform: greenhouse
+  board: biofourmis
+  tags:
+  - sea
+- id: block-greenhouse
+  name: block
+  platform: greenhouse
+  board: block
+  tags:
+  - fintech
+- id: brex-greenhouse
+  name: brex
+  platform: greenhouse
+  board: brex
+  tags:
+  - fintech
+- id: bytedance-smartrecruiters
+  name: bytedance
+  platform: smartrecruiters
+  board: bytedance
+  tags: []
+- id: canva-smartrecruiters
+  name: canva
+  platform: smartrecruiters
+  board: canva
+  tags:
+  - saas
+- id: chime-greenhouse
+  name: chime
+  platform: greenhouse
+  board: chime
+  tags:
+  - fintech
+- id: circle-ashby
+  name: circle
+  platform: ashby
+  board: circle
+  tags:
+  - fintech
+- id: clickhouse-ashby
+  name: clickhouse
+  platform: ashby
+  board: clickhouse
+  tags:
+  - infra
+- id: cloudflare-greenhouse
+  name: cloudflare
+  platform: greenhouse
+  board: cloudflare
+  tags:
+  - infra
+- id: cockroachlabs-greenhouse
+  name: cockroachlabs
+  platform: greenhouse
+  board: cockroachlabs
+  tags:
+  - infra
+- id: cohere-ashby
+  name: cohere
+  platform: ashby
+  board: cohere
+  tags:
+  - ai
+- id: coinbase-greenhouse
+  name: coinbase
+  platform: greenhouse
+  board: coinbase
+  tags:
+  - fintech
+- id: confluent-ashby
+  name: confluent
+  platform: ashby
+  board: confluent
+  tags:
+  - infra
+- id: consensys-greenhouse
+  name: consensys
+  platform: greenhouse
+  board: consensys
+  tags:
+  - fintech
+- id: crypto-lever
+  name: crypto
+  platform: lever
+  board: crypto
+  tags:
+  - fintech
+- id: databricks-greenhouse
+  name: databricks
+  platform: greenhouse
+  board: databricks
+  tags:
+  - infra
+- id: datadog-greenhouse
+  name: datadog
+  platform: greenhouse
+  board: datadog
+  tags:
+  - infra
+- id: docker-ashby
+  name: docker
+  platform: ashby
+  board: docker
+  tags:
+  - infra
+- id: elastic-greenhouse
+  name: elastic
+  platform: greenhouse
+  board: elastic
+  tags:
+  - infra
+- id: fastly-greenhouse
+  name: fastly
+  platform: greenhouse
+  board: fastly
+  tags:
+  - infra
+- id: figma-greenhouse
+  name: figma
+  platform: greenhouse
+  board: figma
+  tags:
+  - saas
+- id: fireblocks-greenhouse
+  name: fireblocks
+  platform: greenhouse
+  board: fireblocks
+  tags:
+  - fintech
+- id: fivetran-greenhouse
+  name: fivetran
+  platform: greenhouse
+  board: fivetran
+  tags:
+  - infra
+- id: flex-greenhouse
+  name: flex
+  platform: greenhouse
+  board: flex
+  tags: []
+- id: flowtraders-greenhouse
+  name: flowtraders
+  platform: greenhouse
+  board: flowtraders
+  tags:
+  - trading
+- id: gemini-greenhouse
+  name: gemini
+  platform: greenhouse
+  board: gemini
+  tags:
+  - fintech
+- id: gitlab-greenhouse
+  name: gitlab
+  platform: greenhouse
+  board: gitlab
+  tags:
+  - infra
+- id: grab-smartrecruiters
+  name: grab
+  platform: smartrecruiters
+  board: grab
+  tags:
+  - sea
+- id: gsacapital-greenhouse
+  name: gsa capital
+  platform: greenhouse
+  board: gsacapital
+  tags:
+  - trading
+- id: imc-greenhouse
+  name: imc
+  platform: greenhouse
+  board: imc
+  tags:
+  - trading
+- id: instacart-greenhouse
+  name: instacart
+  platform: greenhouse
+  board: instacart
+  tags:
+  - saas
+- id: intercom-greenhouse
+  name: intercom
+  platform: greenhouse
+  board: intercom
+  tags:
+  - saas
+- id: janestreet-greenhouse
+  name: janestreet
+  platform: greenhouse
+  board: janestreet
+  tags:
+  - trading
+- id: jumptrading-greenhouse
+  name: jumptrading
+  platform: greenhouse
+  board: jumptrading
+  tags:
+  - trading
+- id: linear-ashby
+  name: linear
+  platform: ashby
+  board: linear
+  tags:
+  - saas
+- id: linkedin-greenhouse
+  name: linkedin
+  platform: greenhouse
+  board: linkedin
+  tags:
+  - bigtech
+- id: lyft-greenhouse
+  name: lyft
+  platform: greenhouse
+  board: lyft
+  tags:
+  - bigtech
+- id: marqeta-greenhouse
+  name: marqeta
+  platform: greenhouse
+  board: marqeta
+  tags:
+  - fintech
+- id: mixpanel-greenhouse
+  name: mixpanel
+  platform: greenhouse
+  board: mixpanel
+  tags:
+  - saas
+- id: modal-ashby
+  name: modal
+  platform: ashby
+  board: modal
+  tags:
+  - ai
+  - infra
+- id: mongodb-greenhouse
+  name: mongodb
+  platform: greenhouse
+  board: mongodb
+  tags:
+  - infra
+- id: netlify-greenhouse
+  name: netlify
+  platform: greenhouse
+  board: netlify
+  tags:
+  - infra
+- id: ninjavan-lever
+  name: ninjavan
+  platform: lever
+  board: ninjavan
+  tags:
+  - sea
+- id: nium-lever
+  name: nium
+  platform: lever
+  board: nium
+  tags:
+  - fintech
+- id: notion-ashby
+  name: notion
+  platform: ashby
+  board: notion
+  tags:
+  - saas
+- id: nubank-ashby
+  name: nubank
+  platform: ashby
+  board: nubank
+  tags:
+  - fintech
+- id: okta-greenhouse
+  name: okta
+  platform: greenhouse
+  board: okta
+  tags:
+  - saas
+- id: openai-ashby
+  name: openai
+  platform: ashby
+  board: openai
+  tags:
+  - ai
+- id: palantir-lever
+  name: palantir
+  platform: lever
+  board: palantir
+  tags: []
+- id: plaid-ashby
+  name: plaid
+  platform: ashby
+  board: plaid
+  tags:
+  - fintech
+- id: point72-greenhouse
+  name: point72
+  platform: greenhouse
+  board: point72
+  tags:
+  - trading
+- id: posthog-ashby
+  name: posthog
+  platform: ashby
+  board: posthog
+  tags:
+  - saas
+- id: ramp-ashby
+  name: ramp
+  platform: ashby
+  board: ramp
+  tags:
+  - fintech
+- id: redis-ashby
+  name: redis
+  platform: ashby
+  board: redis
+  tags:
+  - infra
+- id: ripple-greenhouse
+  name: ripple
+  platform: greenhouse
+  board: ripple
+  tags:
+  - fintech
+- id: robinhood-greenhouse
+  name: robinhood
+  platform: greenhouse
+  board: robinhood
+  tags:
+  - fintech
+- id: scaleai-greenhouse
+  name: scaleai
+  platform: greenhouse
+  board: scaleai
+  tags:
+  - ai
+- id: snowflake-ashby
+  name: snowflake
+  platform: ashby
+  board: snowflake
+  tags:
+  - infra
+- id: sofi-greenhouse
+  name: sofi
+  platform: greenhouse
+  board: sofi
+  tags:
+  - fintech
+- id: squarespace-greenhouse
+  name: squarespace
+  platform: greenhouse
+  board: squarespace
+  tags:
+  - saas
+- id: stripe-greenhouse
+  name: stripe
+  platform: greenhouse
+  board: stripe
+  tags:
+  - bigtech
+- id: temporal-ashby
+  name: temporal
+  platform: ashby
+  board: temporal
+  tags:
+  - infra
+- id: thoughtworks-greenhouse
+  name: thoughtworks
+  platform: greenhouse
+  board: thoughtworks
+  tags: []
+- id: thunes-greenhouse
+  name: thunes
+  platform: greenhouse
+  board: thunes
+  tags:
+  - fintech
+- id: together-smartrecruiters
+  name: together
+  platform: smartrecruiters
+  board: together
+  tags: []
+- id: twilio-greenhouse
+  name: twilio
+  platform: greenhouse
+  board: twilio
+  tags:
+  - saas
+- id: uber-smartrecruiters
+  name: uber
+  platform: smartrecruiters
+  board: uber
+  tags:
+  - bigtech
+- id: vercel-greenhouse
+  name: vercel
+  platform: greenhouse
+  board: vercel
+  tags:
+  - infra
+- id: wise-smartrecruiters
+  name: wise
+  platform: smartrecruiters
+  board: wise
+  tags:
+  - fintech
+- id: sggov-workday
+  name: singapore public service
+  platform: workday
+  board: sggovterp/wd102/PublicServiceCareers
+  tags:
+  - government
+  - sea
+  default_location: Singapore
+- id: dbs-workday
+  name: dbs
+  platform: workday
+  board: dbs/wd3/DBS_Careers
+  tags:
+  - bank
+  - fintech
+  - sea
+- id: ocbc-workday
+  name: ocbc
+  platform: workday
+  board: ocbc/wd102/External
+  tags:
+  - bank
+  - fintech
+  - sea
+- id: uob-workday
+  name: uob
+  platform: workday
+  board: uobgroup/wd3/UOBExternal
+  tags:
+  - bank
+  - fintech
+  - sea
+- id: morganstanley-workday
+  name: morganstanley
+  platform: workday
+  board: ms/wd5/External
+  tags:
+  - bank
+  - trading
+- id: citi-workday
+  name: citi
+  platform: workday
+  board: citi/wd5/2
+  tags:
+  - bank
+  - fintech
+- id: bankofamerica-workday
+  name: bankofamerica
+  platform: workday
+  board: ghr/wd1/lateral-us
+  tags:
+  - bank
+- id: micron-workday
+  name: micron
+  platform: workday
+  board: micron/wd1/External
+  tags:
+  - sea
+- id: salesforce-workday
+  name: salesforce
+  platform: workday
+  board: salesforce/wd12/External_Career_Site
+  tags:
+  - bigtech
+  - saas
+- id: jpmorgan-oraclecloud
+  name: jpmorgan
+  platform: oraclecloud
+  board: jpmc.fa.oraclecloud.com/CX_1001
+  tags:
+  - bank
+  - fintech
+- id: optiverus-greenhouse
+  name: optiver
+  platform: greenhouse
+  board: optiverus
+  tags:
+  - trading
+- id: drweng-greenhouse
+  name: drw
+  platform: greenhouse
+  board: drweng
+  tags:
+  - trading
+- id: squarepointcapital-greenhouse
+  name: squarepoint
+  platform: greenhouse
+  board: squarepointcapital
+  tags:
+  - trading
+- id: amazon-amazonjobs
+  name: amazon
+  platform: amazonjobs
+  board: intern,internship,student
+  tags:
+  - bigtech

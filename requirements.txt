@@ -1,0 +1,11 @@
+requests>=2.32
+pydantic>=2.10
+PyYAML>=6.0
+tqdm>=4.66
+# Resume PDF text extraction (tools/import_resume.py). Pure Python on purpose:
+# no poppler or tesseract toolchain to maintain for a command run once.
+pypdf>=5.1
+# Linting, run by CI and the pre-push hook. Listed here rather than in a
+# separate dev file so one `pip install -r requirements.txt` reproduces the
+# checks CI runs; it is a single binary with no dependencies of its own.
+ruff>=0.16

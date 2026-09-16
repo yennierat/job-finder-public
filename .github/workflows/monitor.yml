@@ -1,0 +1,119 @@
+name: monitor
+
+on:
+  schedule:
+    # Every 6 hours. GitHub cron is best-effort: it slips 10-30 minutes and
+    # occasionally skips a slot entirely, so nothing here may assume exact spacing.
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+# Two runs force-pushing the state branch at once corrupts it. Never cancel a
+# run in progress either: it may have sent notifications it has not recorded yet.
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: write        # required to push the state branch
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # state.db lives on an orphan branch, force-pushed each run, so history
+      # holds exactly one copy instead of growing by ~12MB every 6 hours.
+      - name: Restore state
+        run: |
+          if git fetch origin state 2>/dev/null; then
+            git checkout FETCH_HEAD -- state.db
+            echo "restored $(du -h state.db | cut -f1) state.db"
+          else
+            echo "no state branch yet — this run will seed"
+            echo "SEED=--seed" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run monitor
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # One session id per workflow run, so every LLM call this run makes is
+          # filterable as a group on the OpenRouter dashboard.
+          OPENROUTER_SESSION_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}
+        run: python -m src.run $SEED
+
+      # Runs even if the monitor failed: it may have sent notifications before
+      # dying, and losing those rows would re-notify every one of them next run.
+      - name: Save state
+        if: always()
+        run: |
+          if [ ! -f state.db ]; then echo "no state.db to save"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan state-tmp
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          git add -f state.db          # -f: .gitignore excludes it on main
+          git commit -m "state $(date -u +%FT%TZ) run ${{ github.run_id }}"
+          git push -f origin state-tmp:state
+
+      # A 90-day restore point, because a force-push has no undo.
+      - name: Weekly state backup
+        if: always() && github.event.schedule == '0 0 * * 0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-db-${{ github.run_id }}
+          path: state.db
+          retention-days: 90
+
+      # The only alert that survives the failure it reports.
+      #
+      # src/observability.py sends a heartbeat and a degraded-sources alert, but
+      # both run at the END of src.run, so a run that is killed never reaches
+      # them. On 2026-09-07 the primary model's free tier was withdrawn, runs
+      # began exceeding the 30-minute limit, and the monitor went quiet for 36
+      # hours — indistinguishable from a week with no matching jobs. This step
+      # is curl rather than Python precisely so that nothing it depends on can
+      # be killed along with the job: no interpreter, no imports, no database.
+      #
+      # `failure()` covers timeout, crash, out-of-memory and a missing secret.
+      # It cannot cover a run that never starts; that is what the daily
+      # heartbeat and keepalive.yml are for.
+      - name: Alert on failure
+        if: failure()
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$CHAT" ]; then
+            echo "::warning::Telegram secrets absent; cannot report this failure"
+            exit 0
+          fi
+          # Built with printf rather than a literal multi-line string: inside a
+          # YAML block scalar every line must stay indented, and an unindented
+          # continuation silently ends the block and breaks the whole workflow.
+          TEXT=$(printf '%s\n\n%s\n\n%s' \
+            'Job monitor run FAILED' \
+            'Either it did not finish, or it ended in systemic failure: most boards down, or not one verdict came back from any model. Nothing is lost - a posting with no verdict stays marked as owed one and is retried next run.' \
+            "${URL}")
+
+          # Never let a Telegram error fail this step. The run has already
+          # failed; a second failure here would replace the original cause in
+          # the UI with "could not send a message about it".
+          curl -sS -m 30 -X POST \
+            "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            -d "chat_id=${CHAT}" \
+            -d "disable_web_page_preview=true" \
+            --data-urlencode "text=${TEXT}" \
+            || echo "::warning::could not reach Telegram to report the failure"

@@ -1,0 +1,273 @@
+# Labelled cases for the classifier. Singapore only.
+#
+# Every title here is a real posting from the tracked boards, and every verdict
+# labelled `regression` is one the system actually got wrong and sent. The
+# offline suite could not see either of the two prompt regressions that
+# shipped: it tests parsing, escaping, caching and retries — everything except
+# whether the judgement is any good. This file is that half.
+#
+#   python evals/run_eval.py
+#
+# Descriptions are abridged. Full advert text is never stored (it would add
+# ~25MB), so these are representative excerpts of the length the model actually
+# receives — the first ~500 characters, plus any rescued clause. Titles,
+# employers and locations are verbatim.
+#
+# Fields:
+#   title, location, employment_type   as the fetchers produce them
+#   description                        omit entirely to test the no-text path
+#   match                              expected verdict
+#   why                                why a human says so; printed on failure
+#   min_score / max_score              optional bounds on fit_score
+#   tags                               filtering. `regression` = was wrong in
+#                                      production. `known-fail` = still is; no
+#                                      case carries it at present.
+#
+# Score bounds are wide on purpose. Judging one posting twice gives readings
+# ~15 points apart, so a bound tighter than that fails at random, and a check
+# that cries wolf is one you stop reading. Bounds catch a collapse — every
+# score becoming 50 — not a few points of drift.
+
+cases:
+
+  # --- squarely in the profile: must match -------------------------------
+
+  - id: airwallex-swe-summer-2027
+    title: "Software Engineer Intern (Summer 2027)"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Join our engineering team for a summer internship building and scaling
+      backend services that move money across borders. You will work in Python
+      and Go, ship to production, and own a project end to end alongside
+      senior engineers.
+    match: true
+    min_score: 55
+    why: >-
+      Backend engineering in Python, Singapore, summer 2027. The centre of the
+      profile. min_score is 55 rather than 65 deliberately: scoring the same
+      posting twice gave 60 and 68, and a bound narrower than the model's own
+      ~15-point spread fails at random. A bound that flakes gets ignored.
+    tags: [positive, core]
+
+  - id: micron-ml-ai-engineer-stpg
+    title: "Intern - ML/AI Engineer (Product Engineering, STPG)"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Develop and deploy machine learning models to improve product
+      engineering workflows. You will build data pipelines, train and evaluate
+      models in Python and PyTorch, and work with engineers to put them into
+      production.
+    match: true
+    min_score: 65
+    why: >-
+      An ML engineering role that happens to sit inside a semiconductor
+      company. The work is the model pipeline, not the fab — contrast with the
+      process-integration cases below.
+    tags: [positive, core]
+
+  - id: jumptrading-campus-python-swe
+    title: "Campus Python Software Engineer (Intern)"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Write Python software supporting our trading systems: internal tooling,
+      data services and automation used daily by traders and researchers.
+      Strong software engineering fundamentals required.
+    match: true
+    min_score: 60
+    why: "Python software engineering. The trading context does not change the work."
+    tags: [positive, core]
+
+  - id: drweng-swe-data-engineering
+    title: "Software Engineer Intern (Data Engineering)"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Build and maintain data pipelines that ingest, transform and serve large
+      volumes of market data. You will write production Python, work with
+      distributed storage, and improve pipeline reliability.
+    match: true
+    min_score: 60
+    why: "Data engineering in Python — squarely software engineering."
+    tags: [positive, core]
+
+  - id: swe-intern-no-text
+    title: "Software Engineer Intern - Singapore - 2027"
+    location: "Singapore"
+    employment_type: internship
+    match: true
+    why: >-
+      No description. The title alone names the field, and strictness about
+      missing text must not collapse into rejecting everything without it.
+    tags: [positive, no-text]
+
+  # --- right place, right dates, wrong work ------------------------------
+  # Citi's detail endpoint returns 403, so these are permanently title-only.
+  # The business line before the comma is the only signal, and it is enough.
+
+  - id: citi-wealth-private-bank-sg
+    title: "Wealth - Private Bank, Summer Analyst, Singapore, 2027"
+    location: "Singapore"
+    employment_type: internship
+    match: false
+    why: "Private banking. Not software engineering, AI, LLM ops or DevOps."
+    tags: [regression, no-text, wrong-field]
+
+  - id: citi-wealth-citigold-sg
+    title: "Wealth - Citigold, Summer Analyst, Singapore, 2027"
+    location: "Singapore"
+    employment_type: internship
+    match: false
+    why: "Retail wealth management. Same shape as the case above."
+    tags: [no-text, wrong-field]
+
+  - id: ocbc-banking-ops-support
+    title: "Internship: Global Corporate Banking, Operations Support & Systems"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Support the operations team with transaction processing, reconciliation
+      of banking records, and coordination with relationship managers on
+      client onboarding documentation.
+    match: false
+    max_score: 50
+    why: >-
+      Banking operations. "Systems" in the title is doing the same work that
+      "AI" and "Data" do in the keyword-trap cases below.
+    tags: [wrong-field, keyword-trap]
+
+  - id: ocbc-marketing-intern
+    title: "Internship: Global Consumer Financial Services, Group Marketing"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Assist with campaign planning, customer segmentation analysis and
+      content production for consumer banking products across the region.
+    match: false
+    max_score: 40
+    why: "Marketing. Included because an obvious reject should stay obvious."
+    tags: [wrong-field]
+
+  # --- the keyword trap ---------------------------------------------------
+  # An in-field word in the title (AI, Data) overriding what the work plainly
+  # is. In both of these the model listed the real domain under missing_skills
+  # and matched anyway.
+
+  - id: micron-nti-process-integration-ai
+    title: "Intern - NTI Process Integration - AI Track"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Support process integration for advanced semiconductor nodes, analysing
+      wafer fabrication data and yield metrics across the NTI module, with
+      exposure to AI-assisted analysis of process control data.
+    match: false
+    max_score: 55
+    why: >-
+      Semiconductor process integration. "AI Track" does not make it an AI
+      engineering role. Matched at 72 with "semiconductor manufacturing"
+      listed as a missing skill.
+    tags: [regression, keyword-trap]
+
+  - id: sggov-lifeskills-data-management
+    title: "Data Management Intern, Lifeskills and Lifestyle"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Support the Lifeskills and Lifestyle division with course administration
+      records, maintain attendance reporting, and assist with dashboards for
+      programme policy review.
+    match: false
+    max_score: 60
+    why: >-
+      Administrative records with some reporting. "Data" in the title is doing
+      all the work. Matched at 78; the model's own missing_skills said
+      "administrative support" and "course policy domain".
+    tags: [regression, keyword-trap]
+
+  - id: micron-msb-process-integration
+    title: "Intern - MSB Process Integration Engineer"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Own process integration for the MSB module: monitor wafer yield, drive
+      corrective actions with equipment teams, and qualify process changes
+      through the fab.
+    match: false
+    max_score: 40
+    why: >-
+      Control for the case above. Identical work, no "AI" in the title — if
+      this rejects and the AI Track one matches, the title keyword is the
+      cause rather than anything about the role.
+    tags: [wrong-field, keyword-trap]
+
+  # --- timing overrides a good role ---------------------------------------
+
+  - id: sggov-edp-autumn-commitment
+    title: "Intern, Enterprise Data Platform"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      The intern will support the Enterprise Data Platform team with data
+      ingestion, profiling and preparation, building pipelines in Python and
+      SQL alongside data engineers. Able to commit full time from August 2026
+      to December 2026 / September 2026 to March 2027 for at least 4 to 6
+      months. Please include your availability in your CV.
+    match: false
+    why: >-
+      The work fits well, which is the point: an autumn-to-spring commitment
+      cannot be met by someone available one summer. Matched at 78 until the
+      commitment sentence was rescued from beyond the excerpt cutoff.
+    tags: [regression, timing]
+
+  - id: sggov-dat-summer-control
+    title: "Intern, Data Analytics and Transformation"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Support the data team with ingestion, profiling and preparation,
+      building pipelines in Python and SQL. This is a 12-week internship
+      running from June 2027.
+    match: true
+    min_score: 60
+    why: "Control for the case above: timing that does overlap must not reject."
+    tags: [positive, timing]
+
+  # --- authorization is reported, never used to reject --------------------
+
+  - id: sg-citizen-preference-still-matches
+    title: "Software Engineer Intern"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Summer 2027 internship building backend services in Python. This role is
+      open to Singapore Citizens and Permanent Residents only.
+    match: true
+    why: >-
+      The profile states nothing that a citizens-and-PRs restriction excludes,
+      so it is reported as citizen_or_pr_required and the posting still matches.
+      This case failed until the profile carried the relevant fact: the model
+      scored the role 90, then rejected it on the restriction alone — hiding a
+      role the candidate was fully eligible for. The fix was a fact in the
+      profile, not a rule in the prompt.
+    tags: [positive, authorization]
+
+  - id: sg-role-requiring-other-nationality
+    title: "Software Engineer Intern"
+    location: "Singapore"
+    employment_type: internship
+    description: >-
+      Summer 2027 internship building backend services in Python. This role
+      requires an existing right to work in the United States; we are unable to
+      sponsor or transfer visas of any kind.
+    match: false
+    why: >-
+      The mirror of the case above, and the reason that one is not simply
+      "never reject on authorization". The profile states no right to work in
+      the United States and no sponsorship available there, which is exactly
+      what this advert demands, so it genuinely excludes the candidate.
+      Authorization decides the verdict only when the profile states something
+      the restriction plainly rules out.
+    tags: [authorization]

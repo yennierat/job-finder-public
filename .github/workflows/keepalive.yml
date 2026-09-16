@@ -1,0 +1,73 @@
+name: keepalive
+
+# GitHub disables scheduled workflows after 60 days of repository inactivity.
+# That would stop the monitor silently: no failed run to look at, just nothing.
+#
+# The monitor already force-pushes the state branch every six hours, but that
+# push is made with GITHUB_TOKEN, and pushes authenticated that way are widely
+# reported not to reset the inactivity clock. A keepalive using the same token
+# would therefore add nothing at all. This one needs a personal access token to
+# be worth having, and says so loudly when it does not have one.
+#
+# Setup (once):
+#   1. github.com/settings/tokens  ->  fine-grained token, this repo only,
+#      Contents: read and write. Set an expiry you will actually renew.
+#   2. Repo -> Settings -> Secrets and variables -> Actions -> New secret
+#      Name: KEEPALIVE_TOKEN
+#
+# Monthly, not every 50 days: cron cannot express "50 days", and a monthly run
+# leaves roughly 30 days of margin before the 60-day limit. Two consecutive
+# failures still leave time to notice.
+
+on:
+  schedule:
+    - cron: "0 3 1 * *"     # 03:00 UTC on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record activity
+        env:
+          KEEPALIVE_TOKEN: ${{ secrets.KEEPALIVE_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${KEEPALIVE_TOKEN}" ]; then
+            echo "::warning::KEEPALIVE_TOKEN is not set. A push made with the"
+            echo "::warning::default GITHUB_TOKEN does not reliably reset the"
+            echo "::warning::60-day inactivity clock, so this run does nothing"
+            echo "::warning::useful. See the comment at the top of this file."
+            exit 0
+          fi
+
+          git config user.name  "keepalive"
+          git config user.email "keepalive@users.noreply.github.com"
+
+          # An orphan branch, force-pushed, exactly like the state branch: the
+          # repository sees a push from a real account, while main's history
+          # stays free of empty commits nobody wants to read.
+          git checkout --orphan keepalive-tmp
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          date -u +%FT%TZ > .keepalive
+          git add -f .keepalive
+          git commit -q -m "keepalive $(date -u +%F)"
+
+          git push -f \
+            "https://x-access-token:${KEEPALIVE_TOKEN}@github.com/${REPO}.git" \
+            keepalive-tmp:keepalive
+
+          echo "pushed keepalive branch; inactivity clock reset"

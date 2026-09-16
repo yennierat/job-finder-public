@@ -1,0 +1,297 @@
+{
+ "jobs": [
+  {
+   "absolute_url": "https://job-boards.eu.greenhouse.io/imc/jobs/4940448101",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "education": "education_required",
+   "internal_job_id": null,
+   "location": {
+    "name": "Europe"
+   },
+   "metadata": [
+    {
+     "id": 6607939101,
+     "name": "Vieple Interview Code",
+     "value": null,
+     "value_type": "long_text"
+    },
+    {
+     "id": 6516337101,
+     "name": "Worker Sub Type",
+     "value": null,
+     "value_type": "single_select"
+    },
+    {
+     "id": 6886352101,
+     "name": "Job Category",
+     "value": null,
+     "value_type": "single_select"
+    },
+    {
+     "id": 6894400101,
+     "name": "Career Site Locale",
+     "value": null,
+     "value_type": "single_select"
+    },
+    {
+     "id": 6963404101,
+     "name": "Exclude Resume",
+     "value": null,
+     "value_type": "yes_no"
+    },
+    {
+     "id": 6963467101,
+     "name": "Exclude Education Section",
+     "value": null,
+     "value_type": "yes_no"
+    },
+    {
+     "id": 6516608101,
+     "name": "Is Hidden Job?",
+     "value": null,
+     "value_type": "yes_no"
+    },
+    {
+     "id": 8112897101,
+     "name": "Send Job to Yello?",
+     "value": null,
+     "value_type": "single_select"
+    },
+    {
+     "id": 13611702101,
+     "name": "Uses AI Scoring?",
+     "value": null,
+     "value_type": "single_select"
+    }
+   ],
+   "id": 4940448101,
+   "updated_at": "2026-08-26T07:31:50-04:00",
+   "requisition_id": null,
+   "title": "2027 EU Campus Programme Talent Community",
+   "company_name": "IMC",
+   "first_published": "2026-07-29T04:39:58-04:00",
+   "language": "en",
+   "application_deadline": null,
+   "content": "&lt;p&gt;&lt;strong&gt;Join Our Talent Community&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;em&gt;One place to stay on our radar&lt;/em&gt;&lt;/p&gt;\n&lt;p&gt;Whether you see your future in quant research, trading, or technology - or you&#39;re still keeping an open mind - our range of insight programmes gives you the chance to experience what it&#39;s really like to work at the cutting edge of financial markets. From hands-on interactive sessions to trading simulations and coding challenges, you&#39;ll get a real taste of life at one of the world&#39;s leading trading firms.&lt;/p&gt;\n&lt;p&gt;Not sure yet which programme is the right fit for you? Tell us a bit about yourself and the areas that interest you, and we&#39;ll keep you in mind for the right opportunity down the line. All programmes will take place in Amsterdam in 2027.&lt;/p&gt;\n&lt;p&gt;We&#39;ll let you know as soon as applications open, and keep you updated with news from across our European offices.&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;Joining the talent community isn&#39;t an application - it&#39;s just an easy first step, and it only takes about two minutes&lt;/p&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;\n&lt;p&gt;&lt;em&gt;&lt;strong&gt;Please note:&lt;/strong&gt; as these programmes only run for two days, we are unable to arrange or sponsor visas for candidates travelling to Amsterdam. If you would require a visa to attend, please be aware that we won&#39;t be able to support this.&lt;/em&gt;&lt;/p&gt;&lt;div class=&quot;content-conclusion&quot;&gt;&lt;p&gt;&lt;strong&gt;About Us&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;em&gt;IMC is a research-driven trading firm where quantitative modeling, machine learning, and engineering shape how modern markets are traded. A stabilizing force in markets since 1989, we provide liquidity across trading venues, delivering the best outcome in value and risk management to investors. Using our own technology and capital, we build proprietary systems and algorithms that operate across global markets. Our researchers, traders, and engineers work as a collective, combining rapid experimentation, advanced infrastructure, and real-time feedback to turn insight into execution and execution into advantage.&lt;/em&gt;&lt;/p&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;&lt;/div&gt;",
+   "departments": [],
+   "offices": [],
+   "ai_disclaimer": null,
+   "include_ai_disclaimer": false,
+   "ai_opt_out_request_url": null
+  },
+  {
+   "absolute_url": "https://job-boards.eu.greenhouse.io/imc/jobs/4787218101",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "education": "education_required",
+   "internal_job_id": null,
+   "location": {
+    "name": "Aarhus, Central Denmark Region, Denmark"
+   },
+   "metadata": [
+    {
+     "id": 6607939101,
+     "name": "Vieple Interview Code",
+     "value": null,
+     "value_type": "long_text"
+    },
+    {
+     "id": 6516337101,
+     "name": "Worker Sub Type",
+     "value": null,
+     "value_type": "single_select"
+    },
+    {
+     "id": 6886352101,
+     "name": "Job Category",
+     "value": null,
+     "value_type": "single_select"
+    },
+    {
+     "id": 6894400101,
+     "name": "Career Site Locale",
+     "value": null,
+     "value_type": "single_select"
+    },
+    {
+     "id": 6963404101,
+     "name": "Exclude Resume",
+     "value": null,
+     "value_type": "yes_no"
+    },
+    {
+     "id": 6963467101,
+     "name": "Exclude Education Section",
+     "value": null,
+     "value_type": "yes_no"
+    },
+    {
+     "id": 6516608101,
+     "name": "Is Hidden Job?",
+     "value": null,
+     "value_type": "yes_no"
+    },
+    {
+     "id": 8112897101,
+     "name": "Send Job to Yello?",
+     "value": null,
+     "value_type": "single_select"
+    },
+    {
+     "id": 13611702101,
+     "name": "Uses AI Scoring?",
+     "value": null,
+     "value_type": "single_select"
+    }
+   ],
+   "id": 4787218101,
+   "updated_at": "2026-08-26T07:31:50-04:00",
+   "requisition_id": null,
+   "title": "Aarhus Networking event | IMC Trading ",
+   "company_name": "IMC",
+   "first_published": "2026-02-20T08:08:50-05:00",
+   "language": "en",
+   "application_deadline": null,
+   "content": "&lt;p&gt;Join us for our networking event!&lt;/p&gt;\n&lt;p&gt;Details: &lt;br&gt;May 7, 14:00 - 17:00&lt;br&gt;Location will be disclosed to the students that receive an invite&lt;/p&gt;\n&lt;p&gt;Curious about trading, technology and opportunities at IMC? Come visit our brand new Aarhus office for a tour, short introduction to what we do and a chance to meet the team. Stay for drinks, networking and free pizza!&lt;/p&gt;\n&lt;p&gt;Please note that we will only select 30 students for the event&amp;nbsp;&lt;/p&gt;&lt;div class=&quot;content-conclusion&quot;&gt;&lt;p&gt;&lt;strong&gt;About Us&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;em&gt;IMC is a research-driven trading firm where quantitative modeling, machine learning, and engineering shape how modern markets are traded. A stabilizing force in markets since 1989, we provide liquidity across trading venues, delivering the best outcome in value and risk management to investors. Using our own technology and capital, we build proprietary systems and algorithms that operate across global markets. Our researchers, traders, and engineers work as a collective, combining rapid experimentation, advanced infrastructure, and real-time feedback to turn insight into execution and execution into advantage.&lt;/em&gt;&lt;/p&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;&lt;/div&gt;",
+   "departments": [],
+   "offices": [],
+   "ai_disclaimer": null,
+   "include_ai_disclaimer": false,
+   "ai_opt_out_request_url": null
+  },
+  {
+   "absolute_url": "https://job-boards.eu.greenhouse.io/imc/jobs/4913612101",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "education": "education_required",
+   "employment": "employment_required",
+   "internal_job_id": 4494415101,
+   "location": {
+    "name": "Chicago, United States"
+   },
+   "metadata": [
+    {
+     "id": 6607939101,
+     "name": "Vieple Interview Code",
+     "value": null,
+     "value_type": "long_text"
+    },
+    {
+     "id": 6516337101,
+     "name": "Worker Sub Type",
+     "value": "Experienced",
+     "value_type": "single_select"
+    },
+    {
+     "id": 6886352101,
+     "name": "Job Category",
+     "value": "Business Operations",
+     "value_type": "single_select"
+    },
+    {
+     "id": 6894400101,
+     "name": "Career Site Locale",
+     "value": "us",
+     "value_type": "single_select"
+    },
+    {
+     "id": 6963404101,
+     "name": "Exclude Resume",
+     "value": null,
+     "value_type": "yes_no"
+    },
+    {
+     "id": 6963467101,
+     "name": "Exclude Education Section",
+     "value": null,
+     "value_type": "yes_no"
+    },
+    {
+     "id": 6516608101,
+     "name": "Is Hidden Job?",
+     "value": null,
+     "value_type": "yes_no"
+    },
+    {
+     "id": 8112897101,
+     "name": "Send Job to Yello?",
+     "value": null,
+     "value_type": "single_select"
+    },
+    {
+     "id": 13611702101,
+     "name": "Uses AI Scoring?",
+     "value": null,
+     "value_type": "single_select"
+    }
+   ],
+   "id": 4913612101,
+   "updated_at": "2026-08-26T07:31:50-04:00",
+   "requisition_id": "REQ-04759",
+   "title": "Administrative Assistant",
+   "company_name": "IMC",
+   "first_published": "2026-06-30T15:01:58-04:00",
+   "language": "en",
+   "application_deadline": null,
+   "content": "&lt;p&gt;As an Administrative Assistant, you will provide comprehensive support to a group of senior leaders in a fast-paced trading and research environment.&amp;nbsp; You will work directly with direct stakeholders, coordinate with external parties, and play a critical role in ensuring strong communication across the organization.&lt;/p&gt;\n&lt;p&gt;This position requires on-site work from our Chicago office at least four days per week.&lt;/p&gt;\n&lt;p&gt;&lt;strong&gt;Your Core Responsibilities:&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;Provide day-to-day administrative support for up to four senior managers.&lt;/li&gt;\n&lt;li&gt;Manage complex calendars, schedule meetings, and coordinate across time zones.&lt;/li&gt;\n&lt;li&gt;Coordinate on-site logistics for meetings and presentations, such as audio/visual, meeting rooms, agendas, and meals as needed.&lt;/li&gt;\n&lt;li&gt;Manage travel logistics, including accommodations, transportation, and meals, according to IMC’s policies.&lt;/li&gt;\n&lt;li&gt;Manage and submit business expenses and prepare reports on such as needed.&lt;/li&gt;\n&lt;li&gt;Assist stakeholders with internal and external communications, activity and event planning, and space planning.&lt;/li&gt;\n&lt;li&gt;Liaise with Events team on event logistics, venues, transportation, menus, etc.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;strong&gt;Your Skills and Experience:&amp;nbsp;&lt;/strong&gt;&lt;/p&gt;\n&lt;ul&gt;\n&lt;li&gt;4+ years of experience in an administrative role supporting senior managers; experience supporting multiple people preferred.&lt;/li&gt;\n&lt;li&gt;Must be highly organized and detail-oriented with an ability to manage multiple individual preferences and requirements.&lt;/li&gt;\n&lt;li&gt;Excellent written and verbal communication skills.&lt;/li&gt;\n&lt;li&gt;Strong time management skills and an ability to organize and coordinate multiple concurrent projects.&lt;/li&gt;\n&lt;li&gt;Proficiency with MS Office suite (Outlook, Excel, Word) and an aptitude for learning new software and systems.&lt;/li&gt;\n&lt;li&gt;Flexible team player, willing to adapt to changes and tackle new challenges.&lt;/li&gt;\n&lt;li&gt;Ability to handle confidential and sensitive information with discretion.&lt;/li&gt;\n&lt;/ul&gt;\n&lt;p&gt;&lt;em&gt;Please note that immigration sponsorship is not offered for this specific opening.&lt;/em&gt;&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;The Base Salary range for the role is included below. Base salary is only one component of total compensation; all full-time, permanent positions are eligible for a discretionary bonus and benefits, including paid leave and insurance.&amp;nbsp;Please visit &lt;a href=&quot;https://www.imc.com/us/careers/benefits&quot;&gt;Benefits - US | IMC Trading&lt;/a&gt; for more comprehensive information.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;Salary Range&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$65,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$85,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;content-conclusion&quot;&gt;&lt;p&gt;&lt;strong&gt;About Us&lt;/strong&gt;&lt;/p&gt;\n&lt;p&gt;&lt;em&gt;IMC is a research-driven trading firm where quantitative modeling, machine learning, and engineering shape how modern markets are traded. A stabilizing force in markets since 1989, we provide liquidity across trading venues, delivering the best outcome in value and risk management to investors. Using our own technology and capital, we build proprietary systems and algorithms that operate across global markets. Our researchers, traders, and engineers work as a collective, combining rapid experimentation, advanced infrastructure, and real-time feedback to turn insight into execution and execution into advantage.&lt;/em&gt;&lt;/p&gt;\n&lt;p&gt;&amp;nbsp;&lt;/p&gt;&lt;/div&gt;",
+   "departments": [
+    {
+     "id": 4023851101,
+     "name": "Operations",
+     "child_ids": [
+      4023881101,
+      4023884101,
+      4023883101,
+      4023886101,
+      4023885101,
+      4032474101,
+      4023878101,
+      4023880101,
+      4023852101,
+      4023882101,
+      4023887101,
+      4023879101
+     ],
+     "parent_id": 4023844101
+    }
+   ],
+   "offices": [
+    {
+     "id": 4012408101,
+     "name": "Chicago",
+     "location": "Chicago, United States",
+     "child_ids": [],
+     "parent_id": 4012407101
+    }
+   ],
+   "ai_disclaimer": null,
+   "include_ai_disclaimer": false,
+   "ai_opt_out_request_url": "http://s101.recruiting.eu.greenhouse.io/ai_opt_out_request/job_post/4913612101/ai_opt_out"
+  }
+ ]
+}
