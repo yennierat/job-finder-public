@@ -1,11 +1,10 @@
 name: monitor
 
+# No schedule in this public copy: it would run every six hours without the
+# secrets it needs and fail every time. Run your own copy on the cron in the
+# comment below.
 on:
-  schedule:
-    # Every 6 hours. GitHub cron is best-effort: it slips 10-30 minutes and
-    # occasionally skips a slot entirely, so nothing here may assume exact spacing.
-    - cron: "0 */6 * * *"
-  workflow_dispatch:
+  workflow_dispatch:     # schedule in a private copy: - cron: "0 */6 * * *"
 
 # Two runs force-pushing the state branch at once corrupts it. Never cancel a
 # run in progress either: it may have sent notifications it has not recorded yet.
