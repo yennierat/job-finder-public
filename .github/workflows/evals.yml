@@ -1,0 +1,177 @@
+name: evals
+
+# The offline suite proves the code RUNS. It cannot prove the classifier's
+# JUDGEMENT is still any good — that needs labelled cases and a real model,
+# which is why evals/ lives outside tests/ and never runs in the pre-push hook.
+#
+# The gap that leaves is the failure mode this project actually has. When the
+# code breaks, monitor.yml alerts. When a free model quietly degrades — a tier
+# withdrawn, a slug repointed at a smaller variant, a model that starts
+# narrating instead of answering — nothing breaks. Verdicts just get worse,
+# fewer matches are sent, and fewer messages is indistinguishable from a quiet
+# week in the job market. Both have already happened (minimax-m3's free tier,
+# nemotron-3.5-lightning at 103-125s per attempt producing nothing), and both
+# were found by going and looking rather than by being told.
+#
+# This runs the labelled cases on a schedule so that looking is not required.
+
+on:
+  schedule:
+    # Mondays, 09:00 UTC. Deliberately offset from monitor.yml's "0 */6" slots:
+    # both spend the same free-tier rate limit, and an eval landing on top of a
+    # monitor run earns 429s for the one that matters more.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "Judgements per case (the model is not stable)"
+        default: "3"
+      threshold:
+        description: "Overall pass rate below which this fails"
+        default: "0.8"
+      include_known_fail:
+        description: "Include cases tagged known-fail"
+        type: boolean
+        default: false
+
+# Never two at once: they compete for the same rate limit and both come back
+# looking degraded. Never cancel one either — a half-finished eval reports a
+# pass rate computed from fewer repeats, which reads as a collapse.
+concurrency:
+  group: evals
+  cancel-in-progress: false
+
+permissions:
+  contents: read        # no state branch to write; this reads and reports only
+
+jobs:
+  judge:
+    runs-on: ubuntu-latest
+    # Backstop only, and deliberately looser than the step timeout below. A
+    # JOB-level timeout cancels the job rather than failing it, and `failure()`
+    # is false on a cancellation — so the alert step would be skipped for the
+    # slow-chain failure this workflow exists to catch. The step timeout is what
+    # actually bounds the run; this catches anything outside it.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Judge the labelled cases
+        # The real bound. run_eval.py passes no budget_seconds to classify(), so
+        # nothing inside the process limits a slow model chain the way
+        # CLASSIFY_BUDGET_SECONDS limits a monitor run. A STEP timeout fails the
+        # step, so `failure()` fires and the alert is sent; the job-level
+        # timeout above would merely cancel, and cancellation is silent.
+        timeout-minutes: 25
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # One session id per run, so this eval's calls are filterable as a
+          # group on the OpenRouter dashboard and never mixed with a monitor run.
+          OPENROUTER_SESSION_ID: eval-${{ github.run_id }}-${{ github.run_attempt }}
+          REPEATS: ${{ inputs.repeats || '3' }}
+          THRESHOLD: ${{ inputs.threshold || '0.8' }}
+          INCLUDE_KNOWN_FAIL: ${{ inputs.include_known_fail || false }}
+        run: |
+          set -euo pipefail
+
+          # Dispatch inputs are free text, and they are interpolated into a
+          # command line. "3 --tag positive" as `repeats` would silently narrow
+          # the run to a handful of cases and still report a pass rate that
+          # looks authoritative. A bad threshold is worse than useless: argparse
+          # exits 2, which the alert below would report as the API key being
+          # gone.
+          case "${REPEATS}" in
+            ''|*[!0-9]*) echo "::error::repeats must be a whole number, got '${REPEATS}'"; exit 2 ;;
+          esac
+          case "${THRESHOLD}" in
+            ''|*[!0-9.]*) echo "::error::threshold must be a number 0-1, got '${THRESHOLD}'"; exit 2 ;;
+          esac
+
+          # An array, so each flag stays one argument whatever is inside it.
+          FLAGS=(--repeats "${REPEATS}" --threshold "${THRESHOLD}")
+          # A case tagged known-fail is one already acknowledged as broken.
+          # Counting it would hold the pass rate under the threshold
+          # permanently, and a weekly alert that is always red is one you stop
+          # reading. The scheduled run measures "has anything CHANGED"; a manual
+          # dispatch can opt those cases back in.
+          if [ "${INCLUDE_KNOWN_FAIL}" != "true" ]; then
+            FLAGS+=(--skip-known-fail)
+          fi
+
+          # pipefail is load-bearing. Without it the pipeline's status is tee's,
+          # run_eval.py's non-zero threshold exit is swallowed, and this step
+          # goes green on a collapsed pass rate — a green light wired to nothing.
+          python evals/run_eval.py "${FLAGS[@]}" 2>&1 | tee eval-output.txt
+
+          # The other way to be green while proving nothing: run_eval.py exits 0
+          # when a filter selects no cases at all, printing "no cases selected".
+          # There is no non-zero status for pipefail to propagate, so the pass
+          # rate line is the only evidence that judgement actually happened.
+          if ! grep -qE '^overall ' eval-output.txt; then
+            echo "::error::no pass rate was reported — the harness judged nothing"
+            exit 1
+          fi
+
+      # Always: a failing eval is exactly the one whose per-case table you want
+      # to read, and the Telegram message below carries only a line or two.
+      - name: Upload the results table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # run_attempt too: run_id does NOT change when you click "re-run",
+          # and upload-artifact@v4 rejects a name already present on the run.
+          # That failed upload would itself trip the alert below — a
+          # "Classifier evals FAILED" message carrying a 100% pass rate.
+          name: eval-${{ github.run_id }}-${{ github.run_attempt }}
+          path: eval-output.txt
+          retention-days: 90
+
+      - name: Alert on a drop
+        if: failure()
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$CHAT" ]; then
+            echo "::warning::Telegram secrets absent; cannot report this result"
+            exit 0
+          fi
+
+          # Carry the pass rate itself, when the harness got far enough to print
+          # one. A bare "it failed" sends you to the logs to learn the single
+          # number that says whether this is drift or a collapse. BELOW
+          # THRESHOLD is included so the message carries the bar as well as the
+          # rate: "overall 85%" reads like a collapse on its own, and is not one
+          # if the threshold it missed was 0.9.
+          SUMMARY=$(grep -E '^(overall|failing every repeat|unstable|BELOW THRESHOLD)' \
+            eval-output.txt 2>/dev/null | head -4 || true)
+          if [ -z "${SUMMARY}" ]; then
+            SUMMARY="No pass rate was printed, so the harness did not finish. A timeout means the model chain got slow; a crash usually means the key or the free tier is gone."
+          fi
+
+          # printf rather than a literal multi-line string, for the same reason
+          # monitor.yml uses one: inside a YAML block scalar every line must stay
+          # indented, and an unindented continuation silently ends the block.
+          TEXT=$(printf '%s\n\n%s\n\n%s' \
+            'Classifier evals FAILED' \
+            "${SUMMARY}" \
+            "${URL}")
+
+          # Never let a Telegram error fail this step. The eval result is the
+          # thing being reported; replacing it with "could not send a message
+          # about it" loses the finding.
+          curl -sS -m 30 -X POST \
+            "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            -d "chat_id=${CHAT}" \
+            -d "disable_web_page_preview=true" \
+            --data-urlencode "text=${TEXT}" \
+            || echo "::warning::could not reach Telegram to report this result"

@@ -281,6 +281,10 @@ rate, then exits non-zero below a threshold. Worth knowing:
 Evals live outside `tests/` because they need an API key, need the network, and
 are not repeatable — everything the pre-push hook must not be.
 
+They also run unattended, weekly — see Deployment. Run them by hand before
+committing a prompt change; the schedule is there for the change you did not
+make.
+
 ---
 
 ## Deployment
@@ -296,6 +300,15 @@ application — a `curl` step conditioned on `failure()`, depending on no
 interpreter and no database, so nothing it needs can be killed alongside the job.
 A daily heartbeat covers the opposite case: absence of alerts should never be
 indistinguishable from absence of the system.
+
+`evals.yml` runs the labelled cases weekly, offset from the monitor's slots so
+the two never compete for the same rate limit. It covers the failure this
+system actually has: when the code breaks, the monitor alerts, but when a free
+model quietly degrades nothing breaks at all — verdicts just get worse, and
+fewer messages is indistinguishable from a quiet job market. Cases tagged
+`known-fail` are excluded from the scheduled run — none carry the tag today —
+so a red week means something changed, not that something already known is
+still true.
 
 `keepalive.yml` records activity monthly, because GitHub disables scheduled
 workflows after 60 days of repository inactivity.
@@ -328,7 +341,8 @@ src/
 tools/                board discovery, ATS detection, resume import, shortlist
 tests/                offline: no network, no model, no credentials
 evals/                labelled cases judged by the real classifier
-.github/workflows/    monitor (6h), tests (on push), keepalive (monthly)
+.github/workflows/    monitor (6h), tests (on push), evals (weekly),
+                      keepalive (monthly)
 ```
 
 ~3,700 lines in `src/`, ~1,200 across `tools/` and `evals/`, and ~2,350 of
