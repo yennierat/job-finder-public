@@ -7,6 +7,7 @@
 """
 
 import argparse
+import time
 import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -24,10 +25,12 @@ from src.observability import (exit_code, health_report, log, log_error,
 from src.prefilter import Prefilter
 
 
-# The workflow allows 30 minutes for the whole run. Fetching 98 boards takes
-# ~6, enrichment ~2, and the state push a few seconds; 15 minutes of
-# classification leaves genuine margin. Free models are slow enough that this
-# matters: one batch has been observed taking four minutes to fail.
+# The workflow allows this step 25 minutes. Classification must be finished
+# RUN_BUDGET_SECONDS into the run, and gets at most CLASSIFY_BUDGET_SECONDS;
+# fetching and enrichment have no clock of their own, so a slow fetch shortens
+# classification instead of pushing the run past the step timeout. What is
+# left after RUN_BUDGET_SECONDS covers notifying, the ops messages and pruning.
+RUN_BUDGET_SECONDS = 21 * 60
 CLASSIFY_BUDGET_SECONDS = 15 * 60
 
 
@@ -195,6 +198,7 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=50)
     args = parser.parse_args()
 
+    started = time.monotonic()
     load_env()
     run_id = uuid.uuid4().hex[:12]
     profile = load_profile()
@@ -300,11 +304,12 @@ def main() -> int:
             if verdict.is_match:
                 to_send.append((p, verdict))
 
-    # Leave headroom inside the workflow's 30-minute limit for fetching,
-    # enrichment and the state push. Being killed by the job timeout loses the
-    # run's own bookkeeping; stopping early only defers work to the next run.
+    # Being killed by the timeout loses the run's own bookkeeping; stopping
+    # early only defers work to the next run.
+    budget = max(0.0, min(CLASSIFY_BUDGET_SECONDS,
+                          RUN_BUDGET_SECONDS - (time.monotonic() - started)))
     verdicts = classify(pending, profile, run_id=run_id, conn=conn,
-                        budget_seconds=CLASSIFY_BUDGET_SECONDS,
+                        budget_seconds=budget,
                         on_batch=save) if pending else {}
     log("classify.done", requested=len(pending), returned=len(verdicts))
 

@@ -10,6 +10,7 @@ import os
 import random
 import re
 import sys
+import threading
 import time
 import uuid
 from datetime import UTC, datetime
@@ -32,6 +33,15 @@ CONNECT_TIMEOUT = 10
 READ_TIMEOUT = 90
 TIMEOUT = (CONNECT_TIMEOUT, READ_TIMEOUT)
 
+# Total seconds per attempt, for callers with a deadline. READ_TIMEOUT is per
+# socket read, so a response trickling in never trips it. Callers without a
+# deadline (intake, --test-profile) are interactive and stay uncapped.
+ATTEMPT_LIMIT = 150
+
+
+class AttemptTimedOut(requests.Timeout):
+    """An attempt abandoned at its wall-clock limit, still running upstream."""
+
 APP_URL = "https://github.com/local/job-hunt"
 APP_TITLE = "job-hunt internship monitor"
 
@@ -46,6 +56,28 @@ SESSION_ID = (os.environ.get("OPENROUTER_SESSION_ID")
               or f"job-hunt-{uuid.uuid4().hex[:12]}")
 
 BACKOFF_CAP = 30
+
+
+def _post_within(seconds: float | None, url: str, **kwargs):
+    """requests.post, abandoned after `seconds` (None: never). A thread because
+    requests has no total timeout; daemon so an abandoned one never blocks
+    exit."""
+    box = {}
+
+    def go():
+        try:
+            box["resp"] = requests.post(url, **kwargs)
+        except BaseException as e:
+            box["err"] = e
+
+    worker = threading.Thread(target=go, daemon=True, name="llm-post")
+    worker.start()
+    worker.join(seconds)
+    if worker.is_alive():
+        raise AttemptTimedOut(f"no complete response within {seconds:.0f}s")
+    if "err" in box:
+        raise box["err"]
+    return box["resp"]
 
 
 def _backoff(failures: int, retry_after: float | None = None) -> float:
@@ -232,8 +264,9 @@ def call(stage: str, messages: list, schema: type[T], run_id: str = "",
     per request: a response that trickles in below the read timeout can run
     indefinitely. One was observed taking 861 seconds, which overran a
     240-second caller budget by a factor of four, because the caller can only
-    check the clock between calls. This bounds the overshoot to a single
-    attempt rather than a whole chain of them.
+    check the clock between calls. Each attempt is therefore capped at
+    ATTEMPT_LIMIT and at whatever remains of the deadline, so the deadline
+    holds even while a request is in flight.
     """
     load_env()
     api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -269,9 +302,6 @@ def call(stage: str, messages: list, schema: type[T], run_id: str = "",
 
     failures = 0  # shared across the whole call, so backoff grows monotonically
 
-    def past_deadline() -> bool:
-        return deadline is not None and time.monotonic() >= deadline
-
     def nap(seconds: float) -> None:
         """Back off, but never sleep past the deadline — waiting 30 seconds to
         make one more attempt that cannot be made is pure delay."""
@@ -282,16 +312,22 @@ def call(stage: str, messages: list, schema: type[T], run_id: str = "",
 
     for depth, model in enumerate(model_chain(stage)):
         for attempt in range(attempts_per_model):
-            if past_deadline():
+            # Checked once, and the same reading sizes the attempt: a separate
+            # check could pass with microseconds left, firing a real request
+            # (and spending rate limit) only to abandon it at once.
+            limit = None
+            if deadline is not None:
+                limit = min(ATTEMPT_LIMIT, deadline - time.monotonic())
+            if limit is not None and limit <= 0:
                 raise AllModelsFailed(
                     f"deadline passed for stage={stage} after {failures} "
                     f"failures (session {SESSION_ID})")
             t0 = time.monotonic()
             provider, raw, generation_id = "", "", ""
             try:
-                resp = requests.post(CHAT_URL, headers=headers,
-                                     json={"model": model, **payload_base},
-                                     timeout=TIMEOUT)
+                resp = _post_within(limit, CHAT_URL, headers=headers,
+                                    json={"model": model, **payload_base},
+                                    timeout=TIMEOUT)
                 latency = int((time.monotonic() - t0) * 1000)
 
                 if resp.status_code == 429:
@@ -346,6 +382,13 @@ def call(stage: str, messages: list, schema: type[T], run_id: str = "",
                 trace(model, provider, attempt, "parse_error", 200, latency,
                       False, f"{type(e).__name__}: {raw[:1800] or str(e)[:1800]}",
                       generation_id)
+            except AttemptTimedOut:
+                # No retry on the same model: the abandoned request is still
+                # running there, and a second would compete with it.
+                failures += 1
+                latency = int((time.monotonic() - t0) * 1000)
+                trace(model, provider, attempt, "timeout", None, latency, False)
+                break
             except requests.Timeout:
                 failures += 1
                 latency = int((time.monotonic() - t0) * 1000)

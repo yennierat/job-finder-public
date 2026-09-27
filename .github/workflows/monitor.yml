@@ -42,7 +42,10 @@ jobs:
             echo "SEED=--seed" >> "$GITHUB_ENV"
           fi
 
+      # Under the job timeout: a job timeout skips even `always()` steps, so
+      # state would not be saved and no alert sent.
       - name: Run monitor
+        timeout-minutes: 25
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -85,9 +88,10 @@ jobs:
       # is curl rather than Python precisely so that nothing it depends on can
       # be killed along with the job: no interpreter, no imports, no database.
       #
-      # `failure()` covers timeout, crash, out-of-memory and a missing secret.
-      # It cannot cover a run that never starts; that is what the daily
-      # heartbeat and keepalive.yml are for.
+      # `failure()` covers a crash, out-of-memory, a missing secret and the
+      # monitor step's own timeout. A job timeout or cancel skips this step
+      # entirely; monitor-watch.yml reports those. A run that never starts is
+      # covered by the daily heartbeat and keepalive.yml.
       - name: Alert on failure
         if: failure()
         env:

@@ -1,0 +1,43 @@
+name: monitor-watch
+
+# Alerts on a monitor run that ended without reaching its own alert step. When
+# the monitor's JOB timeout fires, GitHub skips every remaining step, even
+# `if: always()` ones (run #92, 2026-09-23), so only a separate workflow can
+# report it. Plain failures are left to monitor.yml's own step, so each
+# incident sends one message.
+
+on:
+  workflow_run:
+    workflows: [monitor]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  alert:
+    if: contains(fromJSON('["cancelled", "timed_out", "startup_failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Alert
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$CHAT" ]; then
+            echo "::warning::Telegram secrets absent; cannot report this run"
+            exit 0
+          fi
+          TEXT=$(printf '%s\n\n%s\n\n%s' \
+            "Job monitor run ${CONCLUSION^^}" \
+            'It was stopped before finishing, so its state may not have been saved. Postings without a verdict are retried next run.' \
+            "${URL}")
+          curl -sS -m 30 -X POST \
+            "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            -d "chat_id=${CHAT}" \
+            -d "disable_web_page_preview=true" \
+            --data-urlencode "text=${TEXT}" \
+            || echo "::warning::could not reach Telegram"

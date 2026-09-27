@@ -5,6 +5,8 @@ stubbed so backoff does not actually wait.
 """
 
 import sys
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -136,6 +138,9 @@ class FakeResponse:
                              "finish_reason": "stop"}]}
 
 
+HANG = object()  # a request that never completes
+
+
 class FakeTransport:
     """Returns a scripted response (or raises) per call, recording models seen."""
 
@@ -151,6 +156,10 @@ class FakeTransport:
         item = self.script.pop(0) if self.script else FakeResponse(content="dry")
         if isinstance(item, Exception):
             raise item
+        if item is HANG:
+            # Not time.sleep: run_call stubs it out.
+            threading.Event().wait(1)
+            return FakeResponse()  # a valid answer, just late
         return item
 
 
@@ -276,6 +285,33 @@ _, (parsed, _) = run_call([requests.Timeout(), FakeResponse(content=GOOD)])
 check("timeout retried", len(parsed.results), 1)
 _, (parsed, _) = run_call([requests.ConnectionError(), FakeResponse(content=GOOD)])
 check("connection error retried", len(parsed.results), 1)
+
+# A hung request is abandoned at ATTEMPT_LIMIT and the chain moves on.
+real_limit = llm.ATTEMPT_LIMIT
+llm.ATTEMPT_LIMIT = 0.2
+try:
+    t0 = time.monotonic()
+    transport, (parsed, meta) = run_call([HANG, FakeResponse(content=GOOD)],
+                                         deadline=time.monotonic() + 60)
+    check("hung request abandoned and retried", len(parsed.results), 1)
+    check("hung request moves to the next model", meta.fallback_depth, 1)
+    ok("hung request cut off at the attempt limit", time.monotonic() - t0 < 2)
+
+    # Without a deadline there is no cap: the late answer is still accepted.
+    _, (parsed, _) = run_call([HANG])
+    check("no deadline, no attempt cap", parsed.results, [])
+finally:
+    llm.ATTEMPT_LIMIT = real_limit
+
+# The deadline holds mid-request, not just between attempts.
+t0 = time.monotonic()
+raised = False
+try:
+    run_call([HANG], deadline=time.monotonic() + 0.3)
+except llm.AllModelsFailed:
+    raised = True
+check("deadline ends a call whose requests all hang", raised, True)
+ok("deadline honoured mid-request", time.monotonic() - t0 < 2)
 
 # Everything failing raises rather than returning something wrong.
 raised = False
