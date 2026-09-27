@@ -234,6 +234,11 @@ with tempfile.TemporaryDirectory() as tmp:
     check("quarantined after 5 fails", store.is_quarantined(conn, "flaky"), True)
     store.record_source_result(conn, "flaky", True, 10)
     check("recovers on success", store.is_quarantined(conn, "flaky"), False)
+    # A seven-day quarantine written before QUARANTINE_DAYS shrank is lifted.
+    for _ in range(5):
+        store.record_source_result(conn, "legacy", False, quarantine_days=7)
+    check("legacy long quarantine lifted", store.is_quarantined(conn, "legacy"),
+          False)
     conn.close()
 
 

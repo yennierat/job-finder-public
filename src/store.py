@@ -467,8 +467,30 @@ def mark_notified(conn, source_id: str, external_id: str,
 
 # --- source health --------------------------------------------------------
 
+# How long a board that keeps failing is skipped for.
+#
+# One day, not seven. The quarantine exists to stop spending a request per run
+# on a board that is dead, and at four runs a day a week of it saves ~28
+# requests — nothing. What it costs when it fires wrongly is the whole point:
+# 53 of the 98 sources are Greenhouse boards sharing one API host, so a single
+# sustained outage there fails them together rather than independently, and
+# five consecutive runs is only 30 hours. All 53 would then go unread for a
+# week after the outage had resolved.
+#
+# And "skipped" is quiet. run.py drops quarantined sources before counting, so
+# sources_failed/total reads 0%, the degraded-sources alert never fires, and
+# the run exits 0 while over half the boards go unread. The incident is loud;
+# the week after it would not be.
+#
+# A day still removes ~75% of the wasted requests on a genuinely dead board,
+# and one success resets the counter, so a wrongful quarantine heals itself by
+# tomorrow instead of needing to be noticed.
+QUARANTINE_DAYS = 1
+
+
 def record_source_result(conn, source_id: str, ok: bool, count: int = 0,
-                         quarantine_days: int = 7, threshold: int = 5) -> None:
+                         quarantine_days: int = QUARANTINE_DAYS,
+                         threshold: int = 5) -> None:
     row = conn.execute("SELECT * FROM source_health WHERE source_id=?",
                        (source_id,)).fetchone()
     fails = (row["consecutive_fails"] if row else 0)
@@ -498,7 +520,15 @@ def is_quarantined(conn, source_id: str) -> bool:
         (source_id,)).fetchone()
     if not row or not row["quarantined_until"]:
         return False
-    return datetime.fromisoformat(row["quarantined_until"]) > datetime.now(UTC)
+    until = datetime.fromisoformat(row["quarantined_until"])
+    now = datetime.now(UTC)
+    # A quarantine further out than QUARANTINE_DAYS was written under the old
+    # seven-day rule. Honouring it would keep those boards unread for up to a
+    # week after this change; lifting it costs one probe, and a board still
+    # failing is re-quarantined by that probe (its fail count is unchanged).
+    if until - now > timedelta(days=QUARANTINE_DAYS):
+        return False
+    return until > now
 
 
 def previous_count(conn, source_id: str) -> int | None:
