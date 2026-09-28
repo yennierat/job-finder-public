@@ -169,8 +169,10 @@ verdicts to the wrong roles silently.
 in how fast they fail; one was measured at 103–125s per attempt while never once
 returning valid output. The budget is passed down into each individual call
 rather than checked between them, because socket-level timeouts do not bound a
-response that trickles in slowly. Stopping early costs a delay and nothing else,
-which is what the rule below guarantees.
+response that trickles in slowly. Each attempt is also capped at 150s, after
+which the chain moves to the next model, so one hung response cannot hold the
+run past its step timeout. Stopping early costs a delay and nothing else, which
+is what the rule below guarantees.
 
 **A posting is owed a verdict until it has one.** A posting stops being new the
 moment it is stored, which is long before anything has judged it, so being new
@@ -193,10 +195,14 @@ draining is visible before anyone goes looking for it.
 **Delivery is exactly-once.** Notification rows are written only after a
 confirmed send, stored apart from the classification cache, and never pruned.
 Because the row is the record, its absence is the queue: a match with no
-notification row is re-offered on the next run until a send is confirmed.
+notification row is re-offered on the next run until a send is confirmed, for
+as long as the posting is still listed. Telegram rate limits are waited out for
+at most two minutes per run; past that, sending stops for the run and the
+matches simply stay owed.
 
 **Resume data is minimised before it leaves the machine.** Contact details,
-phone numbers and identity numbers are stripped by rule first; the PDF is then
+phone numbers and identity numbers are stripped by rule first — year ranges and
+dates, which the phone rule would otherwise catch, are kept; the PDF is then
 reduced to a short structured summary by a single model call and never sent
 again. The document itself is never stored or committed.
 
@@ -212,9 +218,14 @@ bot-protected or closed to automated access outright.
 Each adapter absorbs a different quirk of its platform: page sizes that are
 silently capped, tenants that serve page 1 indefinitely instead of an empty
 result, display fields that look like unique identifiers but are not, and
-location strings that range from `SG` to `Central Region (City Area)`.
-Normalisation happens once, at the boundary, so every downstream stage deals in
-one vocabulary.
+location strings that range from `SG` to `Central Region (City Area)`, and
+structured fields that contradict the title (Ashby tags many internships
+`FullTime`, so an intern title wins). Normalisation happens once, at the
+boundary, so every downstream stage deals in one vocabulary.
+
+A board that fails five runs in a row is skipped for a day, then probed again.
+Most boards share a few hosts, so one outage can quarantine dozens at once; a
+day saves most of the wasted requests without leaving them dark for a week.
 
 An empty result means "nothing on the boards currently tracked", never "nothing
 exists" — board identifiers are frequently not company names (Optiver publishes
@@ -227,7 +238,7 @@ pipeline on an entirely separate system from their main careers site.
 
 ```bash
 python -m ruff check .     # lint; configuration in ruff.toml
-python tests/run_all.py    # 543 assertions, offline
+python tests/run_all.py    # 586 assertions, offline
 ```
 
 Both run in CI on every push and in a pre-push hook, so neither a lint failure
@@ -241,12 +252,12 @@ that behaves identically on a laptop and in CI.
 
 | Suite | Covers |
 | --- | --- |
-| `test_pipeline` | Canonicalisation, employment type, prefilter, dedupe, idempotency, circuit breaker |
+| `test_pipeline` | Canonicalisation, employment type, prefilter, dedupe, idempotency, circuit breaker, pruning, shortlist batching |
 | `test_llm` | Fallback chain, retry policy per status class, JSON extraction from prose, backoff, responses that are not completions |
 | `test_classify` | Verdict matching by echoed id, batch-poisoning recovery, injection escaping |
 | `test_fetchers` | Seven adapters replayed against recorded responses; detail endpoints |
-| `test_notify` | Message rendering, HTML escaping, notifier selection, heartbeat thresholds |
-| `test_resume` | PDF extraction and its failure modes, redaction, prompt-size caps |
+| `test_notify` | Message rendering, HTML escaping, notifier selection, heartbeat thresholds and counts, Telegram rate limits |
+| `test_resume` | PDF extraction and its failure modes, redaction, prompt-size caps, fit-score clamping |
 | `test_deadline` | Deadline extraction and the dates it must ignore; enrichment isolation |
 | `test_reclassify` | Rejection confirmation, judgement counting, retry bounds |
 | `test_run` | Empty-board detection, delivery outcomes, redelivery bounds |
@@ -293,13 +304,20 @@ make.
 an orphan `state` branch at the start of each run and force-pushed back at the
 end, so history holds exactly one copy of the database rather than a new one per
 run. The save step runs even when the job fails, because a run may have sent
-notifications it has not yet recorded.
+notifications it has not yet recorded. A fresh database is seeded only when the
+`state` branch does not exist; if it cannot be fetched, the run fails instead,
+so a network error can never force-push an empty database over the real one.
+Once a week, tracked by a timestamp inside `state.db` so a skipped run only
+delays it, `state.db` is also uploaded as an artifact kept for 90 days — the
+only undo a force-push has.
 
 Failures are reported by the workflow itself rather than from inside the
 application — a `curl` step conditioned on `failure()`, depending on no
 interpreter and no database, so nothing it needs can be killed alongside the job.
-A daily heartbeat covers the opposite case: absence of alerts should never be
-indistinguishable from absence of the system.
+A job timeout or cancellation skips even that step, so `monitor-watch.yml`
+reports those from a separate workflow. A daily heartbeat covers the opposite
+case: absence of alerts should never be indistinguishable from absence of the
+system.
 
 `evals.yml` runs the labelled cases weekly, offset from the monitor's slots so
 the two never compete for the same rate limit. It covers the failure this
@@ -341,8 +359,8 @@ src/
 tools/                board discovery, ATS detection, resume import, shortlist
 tests/                offline: no network, no model, no credentials
 evals/                labelled cases judged by the real classifier
-.github/workflows/    monitor (6h), tests (on push), evals (weekly),
-                      keepalive (monthly)
+.github/workflows/    monitor (6h), monitor-watch (after each monitor run),
+                      tests (on push), evals (weekly), keepalive (monthly)
 ```
 
 ~3,700 lines in `src/`, ~1,200 across `tools/` and `evals/`, and ~2,350 of
