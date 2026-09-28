@@ -42,6 +42,21 @@ from src.notify import AUTHORIZATION, company_of, deadline_line, fit_band  # noq
 from src.prefilter import Prefilter  # noqa: E402
 
 
+def split_batches(postings: list[Posting]) -> list[list[Posting]]:
+    """BATCH_SIZE at a time, never two with the same external_id in one batch:
+    classify() keys verdicts by external_id alone, so they would share one."""
+    batches, current = [], []
+    for p in postings:
+        if (len(current) == BATCH_SIZE
+                or any(q.external_id == p.external_id for q in current)):
+            batches.append(current)
+            current = []
+        current.append(p)
+    if current:
+        batches.append(current)
+    return batches
+
+
 def authz_mark(value: str) -> tuple[str, str]:
     """(short badge, prose label) for the shortlist, from notify's one table."""
     entry = AUTHORIZATION.get(value)
@@ -185,8 +200,7 @@ def main() -> int:
     print(f"fetched {stats['fetched']} descriptions "
           f"({stats['failed']} refused); {stats['deadlines']} deadlines found")
 
-    batches = [candidates[i:i + BATCH_SIZE]
-               for i in range(0, len(candidates), BATCH_SIZE)]
+    batches = split_batches(candidates)
     matches = []
 
     # Batch by batch rather than one call, so progress is visible and a mid-way

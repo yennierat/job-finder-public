@@ -293,6 +293,23 @@ with tempfile.TemporaryDirectory() as tmp:
     conn.close()
 
 
+# --- shortlist batching ---------------------------------------------------
+# Two boards can share an external_id; in one batch they would share a verdict.
+from tools.shortlist import split_batches  # noqa: E402
+from src.classify import BATCH_SIZE  # noqa: E402
+
+a, b = posting("R-12345", "Singapore"), posting("R-12345", "London")
+b.source_id = "other"
+spread = split_batches([a, posting("x", "Singapore"), b])
+check("colliding ids never share a batch",
+      all(len({p.external_id for p in batch}) == len(batch) for batch in spread),
+      True)
+check("nothing dropped", sum(len(batch) for batch in spread), 3)
+check("batches still capped",
+      max(len(batch) for batch in split_batches(
+          [posting(f"id-{i}", "Singapore") for i in range(10)])), BATCH_SIZE)
+
+
 # --- profile_hash ---------------------------------------------------------
 from src.config import profile_hash  # noqa: E402
 
