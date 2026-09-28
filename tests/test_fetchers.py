@@ -131,6 +131,24 @@ for name, module, fixture, source_id, board, verb in CASES:
     ok(f"{name}: location_raw preserved",
        all(p.location_raw is not None for p in resolved))
 
+# Ashby tags many internships FullTime; an intern title must win.
+real_get = ashby.requests.get
+ashby.requests.get = lambda *a, **kw: FakeResponse({"jobs": [
+    {"id": "1", "title": "Software Engineer Intern - Berlin (2027)",
+     "employmentType": "FullTime"},
+    {"id": "2", "title": "Research Assistant", "employmentType": "Intern"},
+    {"id": "3", "title": "Early Careers & Interns Specialist",
+     "employmentType": "FullTime"},
+]})
+real_sleep, ashby.time.sleep = ashby.time.sleep, lambda *_: None
+try:
+    kinds = [p.employment_type for p in ashby.fetch("x-ashby", "x")]
+finally:
+    ashby.requests.get, ashby.time.sleep = real_get, real_sleep
+check("ashby: intern title beats a FullTime tag", kinds[0], "internship")
+check("ashby: tag used when the title is silent", kinds[1], "internship")
+check("ashby: recruiting interns is not an internship", kinds[2], "full_time")
+
 # Adapters that get descriptions for free must actually extract them; the ones
 # that would need a request per posting must not pretend to.
 WITH_DESCRIPTIONS = {"greenhouse": greenhouse, "lever": lever, "ashby": ashby,

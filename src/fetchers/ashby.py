@@ -5,7 +5,8 @@ import time
 import requests
 
 from src.models import Posting
-from src.normalise import description_excerpt, employment_type, finalise, html_to_text
+from src.normalise import (INTERN_RE, description_excerpt, employment_type, finalise,
+                           html_to_text)
 
 URL = "https://api.ashbyhq.com/posting-api/job-board/{board}"
 
@@ -38,7 +39,9 @@ def fetch(source_id: str, board: str) -> list[Posting]:
         location_raw = ("; ".join([primary, *secondary]) if primary
                         else "; ".join(secondary))
 
-        mapped = TYPES.get((job.get("employmentType") or "").lower())
+        # Ashby tags many internships FullTime, so an intern title outranks it.
+        mapped = ("internship" if INTERN_RE.search(title)
+                  else TYPES.get((job.get("employmentType") or "").lower()))
         postings.append(finalise(Posting(
             source_id=source_id,
             external_id=str(job.get("id")),
