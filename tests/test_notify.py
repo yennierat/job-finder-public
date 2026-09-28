@@ -182,6 +182,55 @@ for k, v in saved.items():
     else:
         os.environ[k] = v
 
+# --- telegram 429 handling -------------------------------------------------
+import time  # noqa: E402
+
+import requests  # noqa: E402
+
+
+class Reply:
+    def __init__(self, status, body):
+        self.status_code, self._body, self.ok = status, body, status == 200
+
+    def json(self):
+        if isinstance(self._body, Exception):
+            raise self._body
+        return self._body
+
+
+def send_with(replies, messages=1):
+    """Send messages through one notifier against scripted replies.
+    Returns (results, sleeps, replies left unused)."""
+    queue, sleeps = list(replies), []
+    real_post, real_sleep = requests.post, time.sleep
+    requests.post = lambda *a, **kw: queue.pop(0)
+    time.sleep = sleeps.append
+    try:
+        n = notify.TelegramNotifier("t", "c")
+        return [n.send_text("hi") for _ in range(messages)], sleeps, len(queue)
+    finally:
+        requests.post, time.sleep = real_post, real_sleep
+
+
+def limited(seconds):
+    return Reply(429, {"parameters": {"retry_after": seconds}})
+
+
+check("a short retry_after is waited out",
+      send_with([limited(3), Reply(200, {})]), ([True], [3], 0))
+check("a 429 without JSON still backs off",
+      send_with([Reply(429, ValueError("not json")), Reply(200, {})]), ([True], [5], 0))
+check("a long ban gives up without waiting",
+      send_with([limited(3600)]), ([False], [], 0))
+check("and later sends skip Telegram entirely",
+      send_with([limited(3600), Reply(200, {})], messages=2), ([False, False], [], 1))
+# Waits are budgeted across the run, not per message, or enough messages would
+# still outlast the step timeout.
+check("the wait budget is shared across messages",
+      send_with([limited(50), Reply(200, {}), limited(50), Reply(200, {}),
+                 limited(50), Reply(200, {})], messages=3),
+      ([True, True, False], [50, 50], 1))
+
 
 # --- heartbeat and degraded alerts ---------------------------------------
 

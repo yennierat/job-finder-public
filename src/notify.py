@@ -9,6 +9,7 @@ from src.models import Posting, Verdict
 from src.normalise import days_until
 
 TELEGRAM_LIMIT = 4000  # real cap is 4096; leave headroom for formatting
+RATE_LIMIT_BUDGET = 120  # seconds of 429 waiting per run
 
 
 class Notifier(Protocol):
@@ -207,6 +208,8 @@ class TelegramNotifier:
         self.chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
         if not self.token or not self.chat_id:
             raise RuntimeError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set")
+        self._waited = 0.0
+        self._banned_until = 0.0
 
     def send(self, posting: Posting, verdict: Verdict) -> bool:
         if self.send_text(format_html(posting, verdict), parse_mode="HTML"):
@@ -220,6 +223,10 @@ class TelegramNotifier:
         import time
 
         import requests
+
+        # Every send during a ban would be refused and could lengthen it.
+        if time.monotonic() < self._banned_until:
+            return False
 
         payload = {"chat_id": self.chat_id, "text": text[:TELEGRAM_LIMIT],
                    "disable_web_page_preview": True}
@@ -238,7 +245,17 @@ class TelegramNotifier:
             if r.status_code == 429:
                 # Telegram allows ~20 messages/min per chat and tells you how
                 # long to wait; ignoring retry_after just earns another 429.
-                time.sleep(int(r.json().get("parameters", {}).get("retry_after", 5)))
+                try:
+                    wait = int(r.json().get("parameters", {}).get("retry_after", 5))
+                except (ValueError, TypeError, AttributeError):
+                    wait = 5
+                # Waits are capped across the whole run so they cannot outlast
+                # the step timeout. Past that, stop sending: matches stay owed.
+                if self._waited + wait > RATE_LIMIT_BUDGET:
+                    self._banned_until = time.monotonic() + wait
+                    return False
+                self._waited += wait
+                time.sleep(wait)
                 continue
             if r.status_code == 400 and parse_mode:
                 # Bad entities. Retrying identically cannot help; let the caller
