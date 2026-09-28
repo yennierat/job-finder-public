@@ -32,14 +32,26 @@ jobs:
 
       # state.db lives on an orphan branch, force-pushed each run, so history
       # holds exactly one copy instead of growing by ~12MB every 6 hours.
+      # Seed only when the branch is absent; seeding after a failed fetch would
+      # force-push an empty database over the real one.
       - name: Restore state
         run: |
-          if git fetch origin state 2>/dev/null; then
-            git checkout FETCH_HEAD -- state.db
-            echo "restored $(du -h state.db | cut -f1) state.db"
-          else
+          for attempt in 1 2 3; do
+            rc=0
+            git ls-remote --exit-code --heads origin state >/dev/null || rc=$?
+            [ "$rc" -eq 0 ] || [ "$rc" -eq 2 ] || [ "$attempt" -eq 3 ] && break
+            sleep $((attempt * 10))
+          done
+          if [ "$rc" -eq 2 ]; then
             echo "no state branch yet — this run will seed"
             echo "SEED=--seed" >> "$GITHUB_ENV"
+          elif [ "$rc" -ne 0 ]; then
+            echo "::error::could not reach origin to restore state; not seeding"
+            exit 1
+          else
+            git fetch origin state
+            git checkout FETCH_HEAD -- state.db
+            echo "restored $(du -h state.db | cut -f1) state.db"
           fi
 
       # Under the job timeout: a job timeout skips even `always()` steps, so
@@ -55,6 +67,19 @@ jobs:
           OPENROUTER_SESSION_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}
         run: python -m src.run $SEED
 
+      # A 90-day restore point, because a force-push has no undo. Due by a stamp
+      # in state.db rather than a cron slot, so a skipped run only delays it.
+      # Before Save state, so the stamp is saved with the database.
+      - name: Check for weekly backup
+        id: weekly
+        if: always() && hashFiles('state.db') != ''
+        run: >-
+          python -c "from src import store;
+          c = store.connect(); h = store.hours_since(c, 'last_state_backup');
+          due = h is None or h >= 7 * 24;
+          due and store.stamp(c, 'last_state_backup');
+          print(f'due={str(due).lower()}')" >> "$GITHUB_OUTPUT"
+
       # Runs even if the monitor failed: it may have sent notifications before
       # dying, and losing those rows would re-notify every one of them next run.
       - name: Save state
@@ -69,9 +94,8 @@ jobs:
           git commit -m "state $(date -u +%FT%TZ) run ${{ github.run_id }}"
           git push -f origin state-tmp:state
 
-      # A 90-day restore point, because a force-push has no undo.
       - name: Weekly state backup
-        if: always() && github.event.schedule == '0 0 * * 0'
+        if: always() && steps.weekly.outputs.due == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: state-db-${{ github.run_id }}
