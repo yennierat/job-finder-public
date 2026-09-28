@@ -273,6 +273,19 @@ ok("report mentions matches", "matches" in report)
 # nothing about whether anything is being judged.
 ok("report mentions the unjudged backlog", "awaiting a verdict" in report)
 
+# Older than a day but on the cutoff's date: once miscounted as today.
+before = observability.health_report(conn)
+conn.execute("INSERT INTO notifications VALUES ('old-src','old-id',?,'r')",
+             (store.ago(1)[:10] + "T00:00:00+00:00",))
+conn.commit()
+after = observability.health_report(conn)
+check("a match from the cutoff's own date is not today",
+      after.split("matches today")[0].split()[-1],
+      before.split("matches today")[0].split()[-1])
+ok("but it is in the last 7 days",
+   after.split("in the last 7 days")[0].split()[-1]
+   != before.split("in the last 7 days")[0].split()[-1])
+
 # Exit code is non-zero only on systemic failure, so one dead board stays quiet.
 check("healthy run exits 0", observability.exit_code(93, 0), 0)
 check("one failure still exits 0", observability.exit_code(92, 1), 0)

@@ -2,7 +2,7 @@
 
 import json
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 
 def log(event: str, **fields) -> None:
@@ -29,23 +29,21 @@ def health_report(conn) -> str:
     broken = conn.execute(
         "SELECT COUNT(*) c FROM source_health WHERE consecutive_fails>0"
     ).fetchone()["c"]
+    from src import store
     today = conn.execute(
-        "SELECT COUNT(*) c FROM notifications WHERE sent_at > datetime('now','-1 day')"
-    ).fetchone()["c"]
+        "SELECT COUNT(*) c FROM notifications WHERE sent_at > ?",
+        (store.ago(1),)).fetchone()["c"]
     week = conn.execute(
-        "SELECT COUNT(*) c FROM notifications WHERE sent_at > datetime('now','-7 days')"
-    ).fetchone()["c"]
+        "SELECT COUNT(*) c FROM notifications WHERE sent_at > ?",
+        (store.ago(7),)).fetchone()["c"]
     postings = conn.execute("SELECT COUNT(*) c FROM postings").fetchone()["c"]
     # Still listed and still owed a verdict. Zero after a run that kept up; a
     # number that stays up is classification falling behind, which "0 matches
     # today" alone cannot tell apart from a quiet market. "Still listed" uses
     # the second-opinion window, since a delisted posting can never be judged.
-    from src import store
-    listed_since = (datetime.now(UTC)
-                    - timedelta(days=store.RETRY_MAX_STALE_DAYS)).isoformat()
     awaiting = conn.execute(
         "SELECT COUNT(*) c FROM postings WHERE awaiting_verdict=1 AND last_seen >= ?",
-        (listed_since,)).fetchone()["c"]
+        (store.ago(store.RETRY_MAX_STALE_DAYS),)).fetchone()["c"]
     return (f"still alive — {healthy} sources healthy, {broken} failing, "
             f"{postings} postings tracked, {awaiting} awaiting a verdict, "
             f"{today} matches today, {week} in the last 7 days")

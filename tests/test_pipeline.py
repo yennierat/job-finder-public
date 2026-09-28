@@ -259,8 +259,8 @@ with tempfile.TemporaryDirectory() as tmp:
     store.mark_notified(conn, old.source_id, old.external_id)
 
     # Backdate one posting past the retention window.
-    conn.execute("UPDATE postings SET last_seen = datetime('now','-200 days') "
-                 "WHERE external_id=?", (old.external_id,))
+    conn.execute("UPDATE postings SET last_seen = ? WHERE external_id=?",
+                 (store.ago(200), old.external_id))
     conn.commit()
 
     result = store.prune(conn, posting_days=90)
@@ -275,6 +275,21 @@ with tempfile.TemporaryDirectory() as tmp:
           conn.execute("SELECT COUNT(*) c FROM notifications").fetchone()["c"], 1)
     check("still suppresses a repost",
           store.already_notified(conn, old.source_id, old.external_id), True)
+    conn.close()
+
+# Past the window but on the cutoff's date: once kept for an extra day.
+with tempfile.TemporaryDirectory() as tmp:
+    conn = store.connect(Path(tmp) / "b.db")
+    edge = posting("Edge Intern", "Singapore")
+    store.upsert_postings(conn, [edge])
+    day_start = store.ago(90)[:10] + "T00:00:00+00:00"
+    conn.execute("UPDATE postings SET last_seen=?", (day_start,))
+    conn.execute("INSERT INTO errors VALUES ('r','s','x','E','m','t',?)", (day_start,))
+    conn.commit()
+    check("posting on the cutoff's date is pruned",
+          store.prune(conn)["postings_pruned"], 1)
+    check("error on the cutoff's date is pruned",
+          conn.execute("SELECT COUNT(*) c FROM errors").fetchone()["c"], 0)
     conn.close()
 
 

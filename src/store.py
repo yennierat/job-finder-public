@@ -76,6 +76,12 @@ def now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def ago(days: float) -> str:
+    """A cutoff in now()'s format. Timestamps compare as text, so SQLite's
+    datetime('now', ...) must not be used against them."""
+    return (datetime.now(UTC) - timedelta(days=days)).isoformat()
+
+
 def connect(path: Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(path or DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -291,8 +297,7 @@ def awaiting_verdict(conn, limit: int = OWED_LIMIT) -> list[tuple[str, str]]:
     it would hold a slot forever — hence the same staleness bound the
     second-opinion queue uses.
     """
-    cutoff = (datetime.now(UTC)
-              - timedelta(days=RETRY_MAX_STALE_DAYS)).isoformat()
+    cutoff = ago(RETRY_MAX_STALE_DAYS)
     rows = conn.execute(
         "SELECT source_id, external_id FROM postings WHERE awaiting_verdict=1 "
         "AND last_seen >= ? ORDER BY first_seen LIMIT ?", (cutoff, limit)).fetchall()
@@ -322,8 +327,7 @@ def awaiting_second_opinion(conn, prompt_version: str, profile_hash: str,
     Oldest first, so a backlog drains in order instead of the same rows being
     retried every run while others never come up.
     """
-    cutoff = (datetime.now(UTC)
-              - timedelta(days=RETRY_MAX_STALE_DAYS)).isoformat()
+    cutoff = ago(RETRY_MAX_STALE_DAYS)
     rows = conn.execute(
         "SELECT c.source_id, c.external_id FROM classifications c "
         "JOIN postings p ON p.source_id = c.source_id "
@@ -619,21 +623,21 @@ def prune(conn, days: int = 90, posting_days: int = 90) -> dict:
     classifications are pruned alongside their posting, since the key they hang
     off is gone; they are re-derivable from a single LLM call if it returns.
     """
-    cutoff = f"datetime('now','-{days} days')"
-    conn.execute(f"DELETE FROM llm_calls WHERE created_at < {cutoff}")
-    conn.execute(f"DELETE FROM errors WHERE occurred_at < {cutoff}")
-    conn.execute(f"DELETE FROM runs WHERE started_at < {cutoff}")
+    cutoff = ago(days)
+    conn.execute("DELETE FROM llm_calls WHERE created_at < ?", (cutoff,))
+    conn.execute("DELETE FROM errors WHERE occurred_at < ?", (cutoff,))
+    conn.execute("DELETE FROM runs WHERE started_at < ?", (cutoff,))
 
     # last_seen is refreshed on every run a posting is still listed, so an old
     # value means the job is gone from the board, not that it is merely old.
-    stale = f"datetime('now','-{posting_days} days')"
+    stale = ago(posting_days)
     dead = conn.execute(
-        f"SELECT source_id, external_id FROM postings WHERE last_seen < {stale}"
+        "SELECT source_id, external_id FROM postings WHERE last_seen < ?", (stale,)
     ).fetchall()
     for row in dead:
         conn.execute("DELETE FROM classifications WHERE source_id=? AND external_id=?",
                      (row["source_id"], row["external_id"]))
-    conn.execute(f"DELETE FROM postings WHERE last_seen < {stale}")
+    conn.execute("DELETE FROM postings WHERE last_seen < ?", (stale,))
     conn.commit()
     return {"postings_pruned": len(dead)}
 

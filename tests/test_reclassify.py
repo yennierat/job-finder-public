@@ -168,8 +168,8 @@ store.upsert_postings(conn2, gone)
 for g in gone:
     judge(conn2, g, False)
 # These rows are the OLDEST rejections, so they sort to the front of the queue.
-conn2.execute("UPDATE postings SET last_seen=datetime('now','-30 days') "
-             "WHERE external_id LIKE 'gone-%'")
+conn2.execute("UPDATE postings SET last_seen=? WHERE external_id LIKE 'gone-%'",
+             (store.ago(30),))
 conn2.execute("UPDATE classifications SET created_at='2000-01-01T00:00:00+00:00' "
              "WHERE external_id LIKE 'gone-%'")
 conn2.commit()
@@ -185,13 +185,13 @@ ok("a still-listed posting gets its slot",
 
 # The boundary: "still listed" means seen recently, not seen ever.
 check("staleness is bounded in days", store.RETRY_MAX_STALE_DAYS, 2)
-conn2.execute("UPDATE postings SET last_seen=datetime('now','-1 days') "
-             "WHERE external_id=?", ("still-listed",))
+conn2.execute("UPDATE postings SET last_seen=? WHERE external_id=?",
+             (store.ago(1), "still-listed"))
 conn2.commit()
 ok("yesterday still counts as listed",
    ("src", "still-listed") in store.awaiting_second_opinion(conn2, PV, PH))
-conn2.execute("UPDATE postings SET last_seen=datetime('now','-5 days') "
-             "WHERE external_id=?", ("still-listed",))
+conn2.execute("UPDATE postings SET last_seen=? WHERE external_id=?",
+             (store.ago(5), "still-listed"))
 conn2.commit()
 ok("five days gone does not",
    ("src", "still-listed") not in store.awaiting_second_opinion(conn2, PV, PH))

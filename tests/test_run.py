@@ -254,8 +254,8 @@ with temp_db("owed-bounds.db") as conn:
     # And a posting that has left its board keeps its mark but stops taking a
     # slot: it can never be judged while delisted, and the queue drains
     # oldest-first, so dead rows would hold every slot forever.
-    conn.execute("UPDATE postings SET last_seen=datetime('now','-30 days') "
-                 "WHERE external_id LIKE 'owed-0%'")
+    conn.execute("UPDATE postings SET last_seen=? WHERE external_id LIKE 'owed-0%'",
+                 (store.ago(30),))
     conn.commit()
     fresh = store.awaiting_verdict(conn)
     check("delisted postings do not hold slots",
