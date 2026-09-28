@@ -421,6 +421,13 @@ with temp_db("reject.db") as conn:
     check("oldest first",
           store.undelivered_matches(conn, PV, PH)[0][0][1], "bulk-000")
 
+    # Delisted matches cannot be sent, so they must not hold the oldest slots.
+    conn.execute("UPDATE postings SET last_seen=? WHERE external_id < 'bulk-010'",
+                 (store.ago(30),))
+    conn.commit()
+    check("delisted matches give up their slots",
+          store.undelivered_matches(conn, PV, PH)[0][0][1], "bulk-010")
+
 
 if failures:
     print(f"{len(failures)} FAILURES:")

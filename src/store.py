@@ -406,7 +406,8 @@ def undelivered_matches(conn, prompt_version: str, profile_hash: str,
     makes "has a match verdict and no notification" precisely the set still owed
     a message. Rows are returned as keys plus a rebuilt Verdict, and run.py
     resolves the keys against what it fetched this run, so a message is only
-    ever sent for a posting that is still live.
+    ever sent for a posting that is still live. Delisted ones are left out so
+    they cannot hold every oldest-first slot.
     """
     rows = conn.execute(
         "SELECT c.source_id, c.external_id, c.category, c.reason,"
@@ -418,9 +419,9 @@ def undelivered_matches(conn, prompt_version: str, profile_hash: str,
         "LEFT JOIN notifications n ON n.source_id = c.source_id"
         " AND n.external_id = c.external_id "
         "WHERE c.prompt_version=? AND c.profile_hash=? AND c.is_match=1 "
-        "AND n.source_id IS NULL "
+        "AND n.source_id IS NULL AND p.last_seen >= ? "
         "ORDER BY c.created_at LIMIT ?",
-        (prompt_version, profile_hash, limit),
+        (prompt_version, profile_hash, ago(RETRY_MAX_STALE_DAYS), limit),
     ).fetchall()
     return [((r["source_id"], r["external_id"]), _verdict_from_row(r))
             for r in rows]
