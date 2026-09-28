@@ -54,6 +54,18 @@ Rules:
 - Omit all contact details, addresses and identity numbers even if present.
 """
 
+# A year with an optional month and day, or a dashed range of two of them.
+_DATE = r"(?:19|20)\d{2}(?:[-./]\d{1,2}){0,2}"
+_DATE_RE = re.compile(rf"{_DATE}(?:\s*-\s*{_DATE})?")
+
+
+def _phone(m: re.Match) -> str:
+    """Keep year ranges and dates ("2022 - 2026", "2024-06-01"): the pattern
+    matches them too, and they are how the model judges experience. Only the
+    date shape is kept, so "2019 2020" is still treated as a phone number."""
+    return m.group() if _DATE_RE.fullmatch(m.group().strip()) else "[phone]"
+
+
 # Applied before the text ever leaves the machine. The resume goes to a
 # third-party API, and a phone number contributes nothing to whether a job fits.
 _REDACTIONS = (
@@ -61,7 +73,7 @@ _REDACTIONS = (
     # +65 9123 4567, (415) 555-0132, 07700 900123 — seven or more digits with
     # the usual separators. Deliberately not matching shorter runs: "2027" and
     # "GPA 4.85" must survive.
-    (re.compile(r"(?<!\w)\+?\d[\d\s().-]{7,}\d(?!\w)"), "[phone]"),
+    (re.compile(r"(?<!\w)\+?\d[\d\s().-]{7,}\d(?!\w)"), _phone),
     # Singapore NRIC/FIN, and lookalike national ids.
     (re.compile(r"(?<!\w)[STFGM]\d{7}[A-Z](?!\w)"), "[id]"),
 )

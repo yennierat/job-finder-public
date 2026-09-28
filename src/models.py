@@ -1,5 +1,6 @@
 """Shared data models for the internship monitor."""
 
+import re
 from datetime import date
 from typing import Literal
 
@@ -135,15 +136,33 @@ class Verdict(BaseModel):
     matched_skills: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
 
-    @field_validator("fit_score")
+    @field_validator("fit_score", mode="before")
     @classmethod
-    def clamp_score(cls, v: int | None) -> int | None:
+    def clamp_score(cls, v) -> int | None:
         """Models emit 8.5, 850 and "95%" for a 0-100 field. Clamp, never reject:
         losing an otherwise good verdict over a stray percentage sign would be a
-        worse outcome than a slightly wrong number."""
-        if v is None:
+        worse outcome than a slightly wrong number. Runs before pydantic's own
+        int check, which rejects 8.5 and "95%" outright.
+
+        "8/10" is scaled. A bare fractional score of 10 or under is probably
+        out of 10 but cannot be told apart from a low percentage, so it is
+        dropped: an unscored verdict is never filtered out, a wrong 8 would be."""
+        if isinstance(v, str):
+            frac = re.search(r"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)", v)
+            found = re.search(r"-?\d+(?:\.\d+)?", v)
+            if frac and float(frac.group(2)) > 0:
+                v = float(frac.group(1)) / float(frac.group(2)) * 100
+            else:
+                v = found.group() if found else None
+        if v is None or isinstance(v, bool):
             return None
-        return max(0, min(100, int(v)))
+        try:
+            score = float(v)
+            if not score.is_integer() and 0 < score <= 10:
+                return None
+            return max(0, min(100, round(score)))
+        except (TypeError, ValueError, OverflowError):
+            return None
 
 
 class VerdictBatch(BaseModel):

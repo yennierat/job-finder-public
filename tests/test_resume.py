@@ -55,6 +55,14 @@ ok("name survives", "Jane Tan" in red)  # the model needs a document, not a blan
 
 check("redaction is idempotent", resume_mod.redact(red), red)
 
+# Year ranges and dates look like phone numbers but must survive.
+for kept in ["NUS, 2022 - 2026", "Intern, 2023-2025", "2024-06-01",
+             "2023.06 - 2024.08"]:
+    check(f"date kept: {kept}", resume_mod.redact(kept), kept)
+for phone in ["2012 3456 789", "2019 2020", "20 2012 34 56", "2012-3456"]:
+    check(f"phone made of year-like digits redacted: {phone}",
+          resume_mod.redact(f"Tel: {phone}"), "Tel: [phone]")
+
 
 # --- whitespace cleaning --------------------------------------------------
 # Two-column CVs extract as ragged lines; that padding is tokens with no meaning.
@@ -239,6 +247,20 @@ check("negative score clamped", Verdict(id="1", is_match=True,
 check("score in range kept", Verdict(id="1", is_match=True,
                                      fit_score=72).fit_score, 72)
 check("absent score stays None", Verdict(id="1", is_match=True).fit_score, None)
+check("ambiguous 8.5 dropped, not read as 8%", Verdict(id="1", is_match=True,
+                                                      fit_score=8.5).fit_score, None)
+check("out-of-ten scaled", Verdict(id="1", is_match=True,
+                                   fit_score="8/10").fit_score, 80)
+check("fractional percentage rounded", Verdict(id="1", is_match=True,
+                                               fit_score=72.6).fit_score, 73)
+# Infinity used to escape as OverflowError, past the parse-error handling.
+inf = VerdictBatch.model_validate_json(
+    '{"results":[{"id":"a","is_match":true,"fit_score":1e400}]}')
+check("non-finite score dropped, verdict kept", inf.results[0].fit_score, None)
+check("percent sign stripped", Verdict(id="1", is_match=True,
+                                       fit_score="95%").fit_score, 95)
+check("unreadable score dropped, verdict kept",
+      Verdict(id="1", is_match=True, fit_score="high").fit_score, None)
 
 # A string score is what a JSON-ish model actually returns; pydantic coerces it.
 parsed = VerdictBatch.model_validate_json(
