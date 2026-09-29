@@ -300,6 +300,14 @@ check("a source outage still alerts while classification is cooling down",
 ok("and names the sources, not the models",
    "60" in n.msgs[-1] and "unjudged" not in n.msgs[-1])
 
+# The alert says how the models failed, not just how often.
+store.set_meta(conn, observability.CLASSIFY_ALERT_KEY, "")
+observability.send_ops_messages(conn, n, 93, 0, verdicts_requested=12,
+                                verdicts_returned=0,
+                                llm_failed={"read_timeout": 5, "rate_limited": 2})
+ok("the alert names the failure kinds",
+   "5 × we gave up: no data" in n.msgs[-1] and "rate limited" in n.msgs[-1])
+
 # Losing some is ordinary on free models, and they are retried next run.
 store.set_meta(conn, observability.CLASSIFY_ALERT_KEY, "")
 partial = observability.send_ops_messages(conn, n, 93, 0, verdicts_requested=12,

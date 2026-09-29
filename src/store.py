@@ -582,6 +582,14 @@ def finish_run(conn, run_id: str, **stats) -> None:
     conn.commit()
 
 
+def llm_failures_by_status(conn, run_id: str | None = None) -> dict[str, int]:
+    """{status: count} of failed LLM attempts, for one run or (None) all."""
+    rows = conn.execute(
+        "SELECT status, COUNT(*) n FROM llm_calls WHERE status!='ok' "
+        "AND (? IS NULL OR run_id=?) GROUP BY status", (run_id, run_id)).fetchall()
+    return {r["status"]: r["n"] for r in rows}
+
+
 def get_meta(conn, key: str) -> str | None:
     row = conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
     return row["value"] if row else None

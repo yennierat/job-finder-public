@@ -17,7 +17,7 @@ from src.classify import PROMPT_VERSION, classify
 from src.config import load_env, load_profile, load_sources, profile_hash
 from src.enrich import enrich
 from src.fetchers import fetch
-from src.llm import SESSION_ID
+from src.llm import SESSION_ID, describe_failures
 from src.models import Posting
 from src.notify import fit_band, make_notifier
 from src.observability import (exit_code, health_report, log, log_error,
@@ -332,16 +332,18 @@ def main() -> int:
             log("notify.redelivering", count=len(redeliver))
         sent = deliver(notifier, to_send + redeliver, conn, run_id)
 
-    llm_stats = conn.execute(
-        "SELECT COUNT(*) n, SUM(status!='ok') f FROM llm_calls WHERE run_id=?",
-        (run_id,)).fetchone()
+    llm_calls = conn.execute("SELECT COUNT(*) n FROM llm_calls WHERE run_id=?",
+                             (run_id,)).fetchone()["n"]
+    llm_failed = store.llm_failures_by_status(conn, run_id)
+    if llm_failed:
+        log("llm.failures", summary=describe_failures(llm_failed), **llm_failed)
 
     store.finish_run(conn, run_id, sources_ok=ok, sources_failed=failed,
                      postings_seen=len(postings), postings_new=len(new),
-                     llm_calls=llm_stats["n"] or 0,
-                     llm_failures=llm_stats["f"] or 0, notifications_sent=sent)
+                     llm_calls=llm_calls, llm_failures=sum(llm_failed.values()),
+                     notifications_sent=sent)
     ops = send_ops_messages(conn, notifier, ok, failed,
-                            llm_failures=llm_stats["f"] or 0,
+                            llm_failed=llm_failed,
                             verdicts_requested=len(pending),
                             verdicts_returned=len(verdicts))
     pruned = store.prune(conn)

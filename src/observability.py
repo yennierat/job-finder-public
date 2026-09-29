@@ -4,6 +4,8 @@ import json
 import sys
 from datetime import UTC, datetime
 
+from src.llm import describe_failures
+
 
 def log(event: str, **fields) -> None:
     record = {"ts": datetime.now(UTC).isoformat(), "event": event, **fields}
@@ -80,7 +82,8 @@ def classification_down(verdicts_requested: int, verdicts_returned: int) -> bool
 
 
 def send_ops_messages(conn, notifier, sources_ok: int, sources_failed: int,
-                      llm_failures: int = 0, verdicts_requested: int = 0,
+                      llm_failed: dict[str, int] | None = None,
+                      verdicts_requested: int = 0,
                       verdicts_returned: int = 0) -> dict:
     """Heartbeat daily, and alert when a run is systemically broken.
 
@@ -116,8 +119,8 @@ def send_ops_messages(conn, notifier, sources_ok: int, sources_failed: int,
     due = [(key, line) for key, line in problems if cooled(key)]
     if due:
         lines = ["job monitor DEGRADED"] + [line for _, line in due]
-        if llm_failures:
-            lines.append(f"{llm_failures} LLM call failures")
+        if llm_failed:
+            lines.append(f"LLM call failures: {describe_failures(llm_failed)}")
         if notifier.send_text("\n".join(lines)):
             for key, _ in due:
                 store.stamp(conn, key)

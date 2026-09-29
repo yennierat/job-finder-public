@@ -118,8 +118,10 @@ _WELL_FORMED = object()
 
 class FakeResponse:
     def __init__(self, status=200, content='{"results": []}', provider="prov",
-                 headers=None, gen_id="gen-1", body=_WELL_FORMED):
+                 headers=None, gen_id="gen-1", body=_WELL_FORMED,
+                 finish_reason="stop"):
         self.status_code = status
+        self._finish = finish_reason
         self.headers = headers or {}
         self._content = content
         self._provider = provider
@@ -135,7 +137,7 @@ class FakeResponse:
             return self._body
         return {"provider": self._provider, "id": self._gen_id,
                 "choices": [{"message": {"content": self._content},
-                             "finish_reason": "stop"}]}
+                             "finish_reason": self._finish}]}
 
 
 HANG = object()  # a request that never completes
@@ -354,6 +356,79 @@ except RuntimeError:
 finally:
     os.environ["OPENROUTER_API_KEY"] = saved
 check("missing API key raises", raised, True)
+
+# --- failure labels ---------------------------------------------------------
+import tempfile  # noqa: E402
+
+from src import store  # noqa: E402
+
+with tempfile.TemporaryDirectory() as tmp:
+    conn = store.connect(Path(tmp) / "labels.db")
+
+    def first_status(item, **kw):
+        conn.execute("DELETE FROM llm_calls")
+        try:
+            run_call([item, FakeResponse(content=GOOD)], conn=conn, **kw)
+        except llm.AllModelsFailed:
+            pass
+        return conn.execute("SELECT status FROM llm_calls ORDER BY rowid"
+                            ).fetchone()["status"]
+
+    for label, item, want in [
+        ("read timeout", requests.ReadTimeout(), "read_timeout"),
+        ("connect timeout", requests.ConnectTimeout(), "connect_timeout"),
+        ("network error", requests.ConnectionError(), "network_error"),
+        ("504", FakeResponse(status=504), "server_timeout"),
+        ("408", FakeResponse(status=408), "server_timeout"),
+        ("503", FakeResponse(status=503), "server_error"),
+        ("429", FakeResponse(status=429), "rate_limited"),
+        ("404", FakeResponse(status=404), "model_unavailable"),
+        ("402", FakeResponse(status=402), "out_of_credits"),
+        ("401", FakeResponse(status=401), "auth_failed"),
+        ("400", FakeResponse(status=400), "bad_request"),
+        ("error body", FakeResponse(body={"error": {"code": 502}}), "provider_error"),
+        ("empty answer", FakeResponse(content=""), "empty_response"),
+        ("cut off", FakeResponse(content='{"results": [{"id"',
+                                 finish_reason="length"), "truncated"),
+        ("cut off while thinking", FakeResponse(content="", finish_reason="length"),
+         "truncated"),
+        ("prose", FakeResponse(content="I think it matches."), "bad_json"),
+        ("wrong fields", FakeResponse(content='{"verdicts": 3}'), "wrong_shape"),
+        # Our metadata model rejecting the response is not the model's fault.
+        ("bad metadata", FakeResponse(content=GOOD, finish_reason=["not text"]),
+         "provider_error"),
+    ]:
+        try:
+            check(f"status for {label}", first_status(item), want)
+        except Exception as e:
+            failures.append(f"status for {label}: raised {type(e).__name__}: {e}")
+
+    # A provider field that is not text must not crash the trace.
+    try:
+        run_call([FakeResponse(content=GOOD, provider=["a", "list"])], conn=conn)
+    except Exception as e:
+        failures.append(f"non-text provider: raised {type(e).__name__}: {e}")
+
+    # 408 is a timeout, retried on the same model like 504, not skipped like 400.
+    transport, _ = run_call([FakeResponse(status=408), FakeResponse(content=GOOD)])
+    check("408 retried on the same model", transport.models[0], transport.models[1])
+
+    real_limit = llm.ATTEMPT_LIMIT
+    llm.ATTEMPT_LIMIT = 0.2
+    try:
+        check("status for a hung request",
+              first_status(HANG, deadline=time.monotonic() + 60), "attempt_limit")
+    finally:
+        llm.ATTEMPT_LIMIT = real_limit
+        conn.close()
+
+ok("every status has words", all(s in llm.STATUS_TEXT for s in (
+    "read_timeout", "attempt_limit", "server_timeout", "truncated")))
+check("summary counts worst first",
+      llm.describe_failures({"rate_limited": 1, "read_timeout": 3}).split(";")[0][:3],
+      "3 ×")
+ok("summary says what 499 means",
+   "499" in llm.describe_failures({"read_timeout": 1}))
 
 
 if failures:

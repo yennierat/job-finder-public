@@ -42,6 +42,63 @@ ATTEMPT_LIMIT = 150
 class AttemptTimedOut(requests.Timeout):
     """An attempt abandoned at its wall-clock limit, still running upstream."""
 
+
+# Each attempt's status in words. OpenRouter shows any request we gave up on as
+# a bare 499; these say which side gave up and why.
+STATUS_TEXT = {
+    "ok": "answered",
+    "rate_limited": "rate limited (429)",
+    "server_timeout": "provider timed out upstream (408/504/524)",
+    "server_error": "provider server error (5xx)",
+    "out_of_credits": "out of credits (402)",
+    "auth_failed": "API key rejected (401/403)",
+    "model_unavailable": "model unavailable (404)",
+    "bad_request": "request rejected (4xx)",
+    "provider_error": "provider sent an error or a body that is not a completion",
+    "empty_response": "empty answer",
+    "truncated": "answer cut off at the token limit",
+    "bad_json": "answer was not JSON",
+    "wrong_shape": "JSON without the expected fields",
+    "attempt_limit": f"we gave up: no full answer within {ATTEMPT_LIMIT}s or "
+                     "the time left (OpenRouter shows 499)",
+    "read_timeout": f"we gave up: no data for {READ_TIMEOUT}s (OpenRouter shows 499)",
+    "connect_timeout": f"could not connect within {CONNECT_TIMEOUT}s",
+    "network_error": "network error",
+}
+
+
+def _http_failure(code: int) -> str:
+    if code == 429:
+        return "rate_limited"
+    if code in (408, 504, 524):
+        return "server_timeout"
+    if code >= 500:
+        return "server_error"
+    return {402: "out_of_credits", 401: "auth_failed", 403: "auth_failed",
+            404: "model_unavailable"}.get(code, "bad_request")
+
+
+def _parse_failure(e: Exception, raw: str, finish_reason: str) -> str:
+    """Why a 200 produced no usable answer."""
+    if isinstance(e, (MalformedResponse, json.JSONDecodeError, KeyError)):
+        return "provider_error"
+    # Before the empty check: a reasoning model can spend the whole token
+    # budget thinking and return no content at all.
+    if finish_reason == "length":
+        return "truncated"
+    if not raw.strip():
+        return "empty_response"
+    if isinstance(e, ValidationError) and any(
+            err.get("type") == "json_invalid" for err in e.errors()):
+        return "bad_json"
+    return "wrong_shape"
+
+
+def describe_failures(counts: dict[str, int]) -> str:
+    """'3 × we gave up: no data for 90s ..., 1 × rate limited (429)', worst first."""
+    return "; ".join(f"{n} × {STATUS_TEXT.get(status, status)}"
+                     for status, n in sorted(counts.items(), key=lambda kv: -kv[1]))
+
 APP_URL = "https://github.com/local/job-hunt"
 APP_TITLE = "job-hunt internship monitor"
 
@@ -323,7 +380,8 @@ def call(stage: str, messages: list, schema: type[T], run_id: str = "",
                     f"deadline passed for stage={stage} after {failures} "
                     f"failures (session {SESSION_ID})")
             t0 = time.monotonic()
-            provider, raw, generation_id = "", "", ""
+            provider, raw, generation_id, finish_reason = "", "", "", ""
+            parsed = None
             try:
                 resp = _post_within(limit, CHAT_URL, headers=headers,
                                     json={"model": model, **payload_base},
@@ -337,38 +395,43 @@ def call(stage: str, messages: list, schema: type[T], run_id: str = "",
                     nap(_backoff(failures,
                                  _retry_after(resp.headers.get("retry-after"))))
                     continue
-                if resp.status_code >= 500:
+                if resp.status_code >= 500 or resp.status_code == 408:
                     failures += 1
-                    trace(model, "", attempt, "transport_error", resp.status_code,
-                          latency, False, resp.text[:2000])
+                    trace(model, "", attempt, _http_failure(resp.status_code),
+                          resp.status_code, latency, False, resp.text[:2000])
                     nap(_backoff(failures))
                     continue
                 if resp.status_code >= 400:
                     # 4xx is our bug (bad model id, bad body) — never retried.
-                    trace(model, "", attempt, "client_error", resp.status_code,
-                          latency, False, resp.text[:2000])
+                    trace(model, "", attempt, _http_failure(resp.status_code),
+                          resp.status_code, latency, False, resp.text[:2000])
                     break
 
                 body = resp.json()
                 choice = _first_choice(body)
+                finish_reason = choice.get("finish_reason") or ""
                 # `or ""` rather than a .get default: a key present with a null
                 # value returns None, which CallMeta rejects as a ValidationError
                 # — and that is caught below as a parse error, discarding an
                 # answer the model had in fact given.
-                provider = body.get("provider") or ""
-                generation_id = body.get("id") or ""
+                # str(): these go into the trace, and SQLite cannot store a list.
+                provider = str(body.get("provider") or "")
+                generation_id = str(body.get("id") or "")
                 raw = choice["message"].get("content") or ""
                 parsed = schema.model_validate_json(_extract_json(raw))
 
-                trace(model, provider, attempt, "ok", 200, latency, True,
-                      generation_id=generation_id)
-                return parsed, CallMeta(
+                # Built before tracing "ok", so a rejection here is not logged
+                # as a success followed by a failure.
+                meta = CallMeta(
                     model=model, provider=provider, attempt=attempt,
                     fallback_depth=depth, latency_ms=latency,
                     input_chars=input_chars, output_chars=len(raw),
-                    finish_reason=choice.get("finish_reason") or "",
+                    finish_reason=finish_reason,
                     session_id=SESSION_ID, generation_id=generation_id,
                 )
+                trace(model, provider, attempt, "ok", 200, latency, True,
+                      generation_id=generation_id)
+                return parsed, meta
 
             except (ValidationError, json.JSONDecodeError, KeyError,
                     MalformedResponse) as e:
@@ -377,9 +440,13 @@ def call(stage: str, messages: list, schema: type[T], run_id: str = "",
                 # the chain moves on quickly.
                 failures += 1
                 latency = int((time.monotonic() - t0) * 1000)
+                # After a successful parse only the metadata can be at fault
+                # (CallMeta rejecting it), not the model's answer.
+                status = ("provider_error" if parsed is not None
+                          else _parse_failure(e, raw, finish_reason))
                 # A malformed body has no content to show, so the trace carries
                 # the exception's own description of what arrived instead.
-                trace(model, provider, attempt, "parse_error", 200, latency,
+                trace(model, provider, attempt, status, 200, latency,
                       False, f"{type(e).__name__}: {raw[:1800] or str(e)[:1800]}",
                       generation_id)
             except AttemptTimedOut:
@@ -387,17 +454,22 @@ def call(stage: str, messages: list, schema: type[T], run_id: str = "",
                 # running there, and a second would compete with it.
                 failures += 1
                 latency = int((time.monotonic() - t0) * 1000)
-                trace(model, provider, attempt, "timeout", None, latency, False)
+                trace(model, provider, attempt, "attempt_limit", None, latency, False)
                 break
+            except requests.ConnectTimeout:
+                failures += 1
+                latency = int((time.monotonic() - t0) * 1000)
+                trace(model, provider, attempt, "connect_timeout", None, latency, False)
+                nap(_backoff(failures))
             except requests.Timeout:
                 failures += 1
                 latency = int((time.monotonic() - t0) * 1000)
-                trace(model, provider, attempt, "timeout", None, latency, False)
+                trace(model, provider, attempt, "read_timeout", None, latency, False)
                 nap(_backoff(failures))
             except requests.RequestException as e:
                 failures += 1
                 latency = int((time.monotonic() - t0) * 1000)
-                trace(model, provider, attempt, "transport_error", None, latency,
+                trace(model, provider, attempt, "network_error", None, latency,
                       False, str(e)[:2000])
                 nap(_backoff(failures))
 
