@@ -52,7 +52,7 @@ jobs:
     # is false on a cancellation — so the alert step would be skipped for the
     # slow-chain failure this workflow exists to catch. The step timeout is what
     # actually bounds the run; this catches anything outside it.
-    timeout-minutes: 30
+    timeout-minutes: 70
 
     steps:
       - uses: actions/checkout@v4
@@ -65,12 +65,10 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Judge the labelled cases
-        # The real bound. run_eval.py passes no budget_seconds to classify(), so
-        # nothing inside the process limits a slow model chain the way
-        # CLASSIFY_BUDGET_SECONDS limits a monitor run. A STEP timeout fails the
-        # step, so `failure()` fires and the alert is sent; the job-level
-        # timeout above would merely cancel, and cancellation is silent.
-        timeout-minutes: 25
+        # Backstop above run_eval.py's 54-minute budget (split across repeats),
+        # ending before the monitor's 12:00 run. A step timeout fails (and
+        # alerts); a job one cancels.
+        timeout-minutes: 60
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # One session id per run, so this eval's calls are filterable as a
@@ -96,7 +94,7 @@ jobs:
           esac
 
           # An array, so each flag stays one argument whatever is inside it.
-          FLAGS=(--repeats "${REPEATS}" --threshold "${THRESHOLD}")
+          FLAGS=(--repeats "${REPEATS}" --threshold "${THRESHOLD}" --total-minutes 54)
           # A case tagged known-fail is one already acknowledged as broken.
           # Counting it would hold the pass rate under the threshold
           # permanently, and a weekly alert that is always red is one you stop
@@ -131,7 +129,9 @@ jobs:
           # That failed upload would itself trip the alert below — a
           # "Classifier evals FAILED" message carrying a 100% pass rate.
           name: eval-${{ github.run_id }}-${{ github.run_attempt }}
-          path: eval-output.txt
+          path: |
+            eval-output.txt
+            eval-log.jsonl
           retention-days: 90
 
       - name: Alert on a drop
@@ -152,10 +152,12 @@ jobs:
           # THRESHOLD is included so the message carries the bar as well as the
           # rate: "overall 85%" reads like a collapse on its own, and is not one
           # if the threshold it missed was 0.9.
-          SUMMARY=$(grep -E '^(overall|failing every repeat|unstable|BELOW THRESHOLD)' \
-            eval-output.txt 2>/dev/null | head -4 || true)
+          SUMMARY=$(grep -E '^(overall|unjudged|model call failures|failing every repeat|never answered|unstable|BELOW THRESHOLD|TOO FEW JUDGED|NEVER ANSWERED)' \
+            eval-output.txt 2>/dev/null | head -9 || true)
           if [ -z "${SUMMARY}" ]; then
-            SUMMARY="No pass rate was printed, so the harness did not finish. A timeout means the model chain got slow; a crash usually means the key or the free tier is gone."
+            # Killed before the summary: the last repeat's failure line still helps.
+            LAST=$(grep -E '^\s+model call failures' eval-output.txt 2>/dev/null | tail -1 | sed 's/^ *//' || true)
+            SUMMARY="No pass rate was printed, so the harness did not finish. ${LAST:-A timeout means the model chain got slow; a crash usually means the key or the free tier is gone.}"
           fi
 
           # printf rather than a literal multi-line string, for the same reason

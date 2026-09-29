@@ -8,3 +8,5 @@ __pycache__/
 shortlist.md
 shortlist.json
 shortlist.csv
+eval-log.jsonl
+eval-output.txt

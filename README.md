@@ -192,6 +192,13 @@ some verdicts is ordinary and stays quiet — they are owed, so they come back.
 The daily heartbeat carries the count still waiting, so a backlog that is not
 draining is visible before anyone goes looking for it.
 
+**Every failed model call says why.** OpenRouter's dashboard shows any request
+we abandoned as a bare HTTP 499. Each attempt is recorded with a specific
+status instead — no data for 90s, no full answer within the attempt limit,
+provider timed out upstream, rate limited, answer cut off at the token limit,
+answer not JSON, and so on — and a run's step log and its DEGRADED alert both
+carry the breakdown, e.g. `5 × we gave up: no data for 90s; 2 × rate limited`.
+
 **Delivery is exactly-once.** Notification rows are written only after a
 confirmed send, stored apart from the classification cache, and never pruned.
 Because the row is the record, its absence is the queue: a match with no
@@ -238,7 +245,7 @@ pipeline on an entirely separate system from their main careers site.
 
 ```bash
 python -m ruff check .     # lint; configuration in ruff.toml
-python tests/run_all.py    # 586 assertions, offline
+python tests/run_all.py    # 610 assertions, offline
 ```
 
 Both run in CI on every push and in a pre-push hook, so neither a lint failure
@@ -253,7 +260,7 @@ that behaves identically on a laptop and in CI.
 | Suite | Covers |
 | --- | --- |
 | `test_pipeline` | Canonicalisation, employment type, prefilter, dedupe, idempotency, circuit breaker, pruning, shortlist batching |
-| `test_llm` | Fallback chain, retry policy per status class, JSON extraction from prose, backoff, responses that are not completions |
+| `test_llm` | Fallback chain, retry policy per status class, JSON extraction from prose, backoff, responses that are not completions, failure labels |
 | `test_classify` | Verdict matching by echoed id, batch-poisoning recovery, injection escaping |
 | `test_fetchers` | Seven adapters replayed against recorded responses; detail endpoints |
 | `test_notify` | Message rendering, HTML escaping, notifier selection, heartbeat thresholds and counts, Telegram rate limits |
@@ -288,6 +295,18 @@ rate, then exits non-zero below a threshold. Worth knowing:
 - **Eval cases never appear in the prompt as examples.** They would pass for free
   and measure nothing. The worked examples in `classify.py` are written
   separately for exactly this reason.
+- **Unanswered cases are not failures.** Each repeat has a time budget (18
+  minutes by default; the weekly run splits 54 across its repeats), which also
+  caps every model attempt. A case no model answered is reported as unjudged
+  and left out of the pass rate, because a slow model day is not the
+  classifier's judgement getting worse. A case the model answered around —
+  present in the batch, missing from the reply — still counts as a failure. The
+  run fails anyway if most cases go unjudged, or if any case is never answered
+  in any repeat.
+- **Everything is logged as it happens.** Each case prints as its verdict lands,
+  and `eval-log.jsonl` records every model attempt (model, status, latency) and
+  every case result, so a run killed part-way still shows what the models were
+  doing.
 
 Evals live outside `tests/` because they need an API key, need the network, and
 are not repeatable — everything the pre-push hook must not be.
@@ -326,7 +345,8 @@ model quietly degrades nothing breaks at all — verdicts just get worse, and
 fewer messages is indistinguishable from a quiet job market. Cases tagged
 `known-fail` are excluded from the scheduled run — none carry the tag today —
 so a red week means something changed, not that something already known is
-still true.
+still true. The step is capped at an hour, clear of the monitor's next run, and
+`eval-output.txt` and `eval-log.jsonl` are kept as an artifact for 90 days.
 
 `keepalive.yml` records activity monthly, because GitHub disables scheduled
 workflows after 60 days of repository inactivity.
